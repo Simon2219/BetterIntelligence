@@ -1,0 +1,15 @@
+node_modules/
+data/db/*.db
+data/db/*.db-shm
+data/db/*.db-wal
+data/media/*
+data/skills/workspace/*
+data/skills/installed/*
+data/logs/*
+certs/
+!certs/README.md
+.env
+*.log
+.DS_Store
+Thumbs.db
+.cursor/

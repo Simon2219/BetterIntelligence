@@ -1,0 +1,35 @@
+{
+  "server": { "port": 3000, "host": "localhost" },
+  "db": { "path": "./data/db/betterintelligence.db" },
+  "media": { "path": "./data/media" },
+  "skills": { "basePath": "./data/skills" },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "systems": { "auth": "info", "api": "info", "server": "info", "socket": "info", "db": "warn" },
+    "output": { "console": true, "file": true },
+    "file": { "path": "./data/logs", "maxSizeMB": 10, "maxFiles": 5 }
+  },
+  "app": {
+    "name": "BetterIntelligence",
+    "version": "0.1.0",
+    "defaultTheme": "dark"
+  },
+  "auth": {
+    "accessTokenExpiryMinutes": 15,
+    "refreshTokenExpiryDays": 30,
+    "passwordMinLength": 8,
+    "passwordRequireUppercase": true,
+    "passwordRequireNumber": true
+  },
+  "ai": {
+    "enabled": false,
+    "defaultTextProvider": "ollama",
+    "ollamaUrl": "http://localhost:11434",
+    "ollamaModel": "llama3.2",
+    "temperature": 0.8,
+    "maxTokens": 512,
+    "historyMessagesLimit": 50
+  },
+  "rateLimit": { "windowMs": 900000, "maxRequests": 300 }
+}
