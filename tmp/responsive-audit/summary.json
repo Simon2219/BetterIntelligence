@@ -1,0 +1,248 @@
+{
+  "base": "http://localhost:3001",
+  "slug": "audit-1772403478080",
+  "personalChatId": "Z61AUD9U5NE5",
+  "deploymentChatId": "5VX9X7EDW728",
+  "summary": [
+    {
+      "width": 320,
+      "route": "/deploy",
+      "viewportWidth": 320,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "320-deploy-list.png"
+    },
+    {
+      "width": 320,
+      "route": "/deploy/audit-1772403478080",
+      "viewportWidth": 320,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "320-deploy-overview.png"
+    },
+    {
+      "width": 320,
+      "route": "/deploy/audit-1772403478080?tab=chats",
+      "viewportWidth": 320,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "320-deploy-chats.png"
+    },
+    {
+      "width": 320,
+      "route": "/chat",
+      "viewportWidth": 320,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "320-chat-hub.png"
+    },
+    {
+      "width": 320,
+      "route": "/chat/Z61AUD9U5NE5",
+      "viewportWidth": 320,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "320-chat-personal-thread.png"
+    },
+    {
+      "width": 320,
+      "route": "/chat/5VX9X7EDW728",
+      "viewportWidth": 320,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "320-chat-deployment-thread.png"
+    },
+    {
+      "width": 375,
+      "route": "/deploy",
+      "viewportWidth": 375,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "375-deploy-list.png"
+    },
+    {
+      "width": 375,
+      "route": "/deploy/audit-1772403478080",
+      "viewportWidth": 375,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "375-deploy-overview.png"
+    },
+    {
+      "width": 375,
+      "route": "/deploy/audit-1772403478080?tab=chats",
+      "viewportWidth": 375,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "375-deploy-chats.png"
+    },
+    {
+      "width": 375,
+      "route": "/chat",
+      "viewportWidth": 375,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "375-chat-hub.png"
+    },
+    {
+      "width": 375,
+      "route": "/chat/Z61AUD9U5NE5",
+      "viewportWidth": 375,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "375-chat-personal-thread.png"
+    },
+    {
+      "width": 375,
+      "route": "/chat/5VX9X7EDW728",
+      "viewportWidth": 375,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "375-chat-deployment-thread.png"
+    },
+    {
+      "width": 768,
+      "route": "/deploy",
+      "viewportWidth": 768,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "768-deploy-list.png"
+    },
+    {
+      "width": 768,
+      "route": "/deploy/audit-1772403478080",
+      "viewportWidth": 768,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "768-deploy-overview.png"
+    },
+    {
+      "width": 768,
+      "route": "/deploy/audit-1772403478080?tab=chats",
+      "viewportWidth": 768,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "768-deploy-chats.png"
+    },
+    {
+      "width": 768,
+      "route": "/chat",
+      "viewportWidth": 768,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "768-chat-hub.png"
+    },
+    {
+      "width": 768,
+      "route": "/chat/Z61AUD9U5NE5",
+      "viewportWidth": 768,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "768-chat-personal-thread.png"
+    },
+    {
+      "width": 768,
+      "route": "/chat/5VX9X7EDW728",
+      "viewportWidth": 768,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "768-chat-deployment-thread.png"
+    },
+    {
+      "width": 1024,
+      "route": "/deploy",
+      "viewportWidth": 1024,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1024-deploy-list.png"
+    },
+    {
+      "width": 1024,
+      "route": "/deploy/audit-1772403478080",
+      "viewportWidth": 1024,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1024-deploy-overview.png"
+    },
+    {
+      "width": 1024,
+      "route": "/deploy/audit-1772403478080?tab=chats",
+      "viewportWidth": 1024,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1024-deploy-chats.png"
+    },
+    {
+      "width": 1024,
+      "route": "/chat",
+      "viewportWidth": 1024,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1024-chat-hub.png"
+    },
+    {
+      "width": 1024,
+      "route": "/chat/Z61AUD9U5NE5",
+      "viewportWidth": 1024,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1024-chat-personal-thread.png"
+    },
+    {
+      "width": 1024,
+      "route": "/chat/5VX9X7EDW728",
+      "viewportWidth": 1024,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1024-chat-deployment-thread.png"
+    },
+    {
+      "width": 1440,
+      "route": "/deploy",
+      "viewportWidth": 1440,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1440-deploy-list.png"
+    },
+    {
+      "width": 1440,
+      "route": "/deploy/audit-1772403478080",
+      "viewportWidth": 1440,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1440-deploy-overview.png"
+    },
+    {
+      "width": 1440,
+      "route": "/deploy/audit-1772403478080?tab=chats",
+      "viewportWidth": 1440,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1440-deploy-chats.png"
+    },
+    {
+      "width": 1440,
+      "route": "/chat",
+      "viewportWidth": 1440,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1440-chat-hub.png"
+    },
+    {
+      "width": 1440,
+      "route": "/chat/Z61AUD9U5NE5",
+      "viewportWidth": 1440,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1440-chat-personal-thread.png"
+    },
+    {
+      "width": 1440,
+      "route": "/chat/5VX9X7EDW728",
+      "viewportWidth": 1440,
+      "docOverflow": 0,
+      "offscreen": [],
+      "screenshot": "1440-chat-deployment-thread.png"
+    }
+  ]
+}

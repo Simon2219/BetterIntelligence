@@ -1,0 +1,13 @@
+/* Hub */
+.hub-featured-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr)); gap: 1rem; }
+.hub-card-meta--sm { font-size: 0.85rem; }
+.hub-card-header--tight { margin-bottom: 0.5rem; }
+.hub-avatar--md { width: 3rem; height: 3rem; }
+.hub-avatar--lg { width: 5rem; height: 5rem; }
+.hub-title-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.hub-title-row--detail { font-size: 1.25rem; gap: 0.45rem; }
+.hub-tagline--sm { font-size: 0.8rem; }
+.hub-badge-success { background: var(--success); color: #fff; }
+.hub-detail-card { max-width: 37.5rem; margin-top: 1rem; }
+.hub-detail-meta { margin: 0.75rem 0; }
+

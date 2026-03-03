@@ -1,0 +1,100 @@
+/* Cards */
+.card {
+    background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+    border: 0.0625rem solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--bg-primary) 26%, transparent);
+}
+.card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr)); gap: clamp(0.75rem, 2vw, 1.25rem); }
+.agent-card-grid { grid-template-columns: repeat(auto-fill, minmax(22.5rem, 1fr)); gap: clamp(1.25rem, 2vw, 1.75rem); }
+.card-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.75rem; }
+.card-avatar { width: 3rem; height: 3rem; border-radius: 50%; background: var(--bg-secondary); object-fit: cover; flex-shrink: 0; }
+.card-title { font-weight: 600; font-size: 1.05rem; }
+.card-meta { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
+.card-body-meta { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.card-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+.agent-card { transition: all 0.2s; padding: clamp(1.5rem, 2.5vw, 2rem); min-height: 13.75rem; }
+.agent-card:hover { transform: translateY(-0.125rem); box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.2); }
+.agent-card-dragging { opacity: 0.6; cursor: grabbing; }
+.agent-card { border-left: 0.1875rem solid var(--accent); }
+.agent-card--subscribed { border-left-color: var(--info); background: linear-gradient(90deg, rgba(59, 130, 246, 0.04) 0%, transparent 0.75rem); }
+.agent-card--model-warning {
+    border-left-color: var(--warning);
+    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--warning) 26%, transparent), 0 0.5rem 1.5rem color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.agent-card--model-error {
+    border-left-color: var(--danger);
+    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--danger) 28%, transparent), 0 0.5rem 1.5rem color-mix(in srgb, var(--danger) 10%, transparent);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--danger) 8%, transparent) 0%, transparent 1.5rem);
+}
+.agent-card-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.agent-card-actions .btn-primary { flex: 1; min-width: 8.125rem; padding: 0.6rem 1.1rem; font-weight: 600; font-size: 0.95rem; }
+.agent-card-actions .btn-ghost { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+.agent-card .card-body-meta { gap: 0.4rem; }
+.agent-card .badge-provider, .agent-card .badge-model { font-size: 0.75rem; padding: 0.18rem 0.45rem; }
+.agent-health-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.26rem;
+    padding: 0.12rem 0.42rem;
+    border-radius: 62.4375rem;
+    border: 0.0625rem solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.agent-health-indicator__dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.agent-health-indicator--ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 34%, var(--border)); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.agent-health-indicator--ok .agent-health-indicator__dot { background: var(--success); }
+.agent-health-indicator--warning { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, var(--border)); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.agent-health-indicator--warning .agent-health-indicator__dot { background: var(--warning); }
+.agent-health-indicator--error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.agent-health-indicator--error .agent-health-indicator__dot { background: var(--danger); }
+.agent-health-indicator--unknown .agent-health-indicator__dot { background: var(--text-muted); }
+.agent-model-notice {
+    margin: 0.45rem 0 0.15rem;
+    font-size: 0.76rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: var(--radius-sm);
+    border: 0.0625rem solid var(--border);
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+}
+.agent-model-notice--warning {
+    border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+    color: color-mix(in srgb, var(--warning) 78%, var(--text-primary));
+}
+.agent-model-notice--error {
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+    background: color-mix(in srgb, var(--danger) 11%, transparent);
+    color: color-mix(in srgb, var(--danger) 80%, var(--text-primary));
+}
+.agents-category-submenu { position: fixed; background: var(--bg-card); border: 0.0625rem solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 0.25rem; min-width: 11.25rem; z-index: 1000; display: none; }
+.agents-category-submenu--open { display: block; }
+.agents-submenu-item { display: flex; align-items: center; width: 100%; padding: 0.5rem 0.75rem; background: none; border: none; cursor: pointer; font-size: 0.9rem; text-align: left; border-radius: 0.25rem; color: inherit; }
+.agents-submenu-item:hover { background: var(--bg-hover); }
+.agent-card-submenu { position: fixed; background: var(--bg-card); border: 0.0625rem solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 0.25rem; min-width: 10rem; z-index: 1000; }
+.agents-category-drop { transition: background 0.2s, border-color 0.2s; }
+.agents-category-drop--over { background: rgba(59, 130, 246, 0.06); border-radius: var(--radius-sm); outline: 0.125rem dashed rgba(59, 130, 246, 0.3); outline-offset: 0.25rem; }
+.agents-category-dropzone { min-height: 5rem; }
+.badge-provider { background: var(--accent); color: white; }
+.badge-model { background: var(--bg-hover); color: var(--text-secondary); border: 0.0625rem solid var(--border); }
+.badge-tag { background: rgba(14, 165, 233, 0.2); color: var(--accent); border: 0.0625rem solid rgba(14, 165, 233, 0.3); }
+
+/* Agents empty hints */
+.agents-empty-hint { padding: 2rem; text-align: center; background: var(--bg-secondary); border: 0.0625rem dashed var(--border); border-radius: var(--radius); color: var(--text-muted); }
+.agents-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.5; }
+.agents-empty-hint p { margin: 0; font-size: 0.95rem; }
+.category-dragging { opacity: 0.5; }
+

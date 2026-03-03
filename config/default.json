@@ -1,19 +1,79 @@
 {
-  "server": { "port": 3000, "host": "localhost" },
-  "db": { "path": "./data/db/betterintelligence.db" },
-  "media": { "path": "./data/media" },
-  "skills": { "basePath": "./data/skills" },
+  "server": {
+    "port": 3000,
+    "host": "localhost"
+  },
+  "db": {
+    "path": "./data/db/betterintelligence.db"
+  },
+  "media": {
+    "path": "./data/media"
+  },
+  "skills": {
+    "basePath": "./data/skills"
+  },
   "logging": {
     "enabled": true,
     "level": "info",
-    "systems": { "auth": "info", "api": "info", "server": "info", "socket": "info", "db": "warn" },
-    "output": { "console": true, "file": true },
-    "file": { "path": "./data/logs", "maxSizeMB": 10, "maxFiles": 5 }
+    "systems": {
+      "auth": "info",
+      "api": "info",
+      "server": "info",
+      "socket": "info",
+      "db": "warn"
+    },
+    "output": {
+      "console": true,
+      "file": true
+    },
+    "file": {
+      "path": "./data/logs",
+      "maxSizeMB": 10,
+      "maxFiles": 5
+    }
   },
   "app": {
     "name": "BetterIntelligence",
     "version": "0.1.0",
     "defaultTheme": "dark"
+  },
+  "colors": {
+    "dark": {
+      "bg-primary": "#070f1f",
+      "bg-secondary": "#0d1728",
+      "bg-card": "#13213a",
+      "bg-hover": "#1a2d4d",
+      "text-primary": "#e8f0ff",
+      "text-secondary": "#b7c6e6",
+      "text-muted": "#7f94bf",
+      "accent": "#3b82f6",
+      "accent-primary": "#1d4ed8",
+      "accent-secondary": "#0ea5e9",
+      "accent-hover": "#60a5fa",
+      "success": "#22c55e",
+      "danger": "#ef4444",
+      "warning": "#f59e0b",
+      "info": "#38bdf8",
+      "border": "#22385e"
+    },
+    "light": {
+      "bg-primary": "#f3f8ff",
+      "bg-secondary": "#ffffff",
+      "bg-card": "#ffffff",
+      "bg-hover": "#e8f0ff",
+      "text-primary": "#0d1b33",
+      "text-secondary": "#2f4872",
+      "text-muted": "#60779f",
+      "accent": "#2563eb",
+      "accent-primary": "#1d4ed8",
+      "accent-secondary": "#0284c7",
+      "accent-hover": "#3b82f6",
+      "success": "#16a34a",
+      "danger": "#dc2626",
+      "warning": "#d97706",
+      "info": "#0ea5e9",
+      "border": "#c7d8f3"
+    }
   },
   "auth": {
     "accessTokenExpiryMinutes": 15,
@@ -22,14 +82,41 @@
     "passwordRequireUppercase": true,
     "passwordRequireNumber": true
   },
+  "security": {
+    "acceptSocketQueryToken": true,
+    "allowNoOriginInDev": true,
+    "allowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+      "https://localhost:3000",
+      "https://localhost:3001",
+      "https://127.0.0.1:3000",
+      "https://127.0.0.1:3001"
+    ],
+    "httpCorsOrigins": [
+      "*"
+    ],
+    "socketCorsOrigins": [
+      "*"
+    ]
+  },
   "ai": {
-    "enabled": false,
+    "enabled": true,
     "defaultTextProvider": "ollama",
+    "defaultImageProvider": "comfyui",
     "ollamaUrl": "http://localhost:11434",
-    "ollamaModel": "llama3.2",
+    "ollamaModel": "huihui_ai/qwen2.5-abliterate:7b",
+    "comfyuiUrl": "http://localhost:8188",
+    "comfyuiModel": "flux2_dev_fp8mixed.safetensors",
+    "comfyuiStartWithServer": true,
     "temperature": 0.8,
     "maxTokens": 512,
     "historyMessagesLimit": 50
   },
-  "rateLimit": { "windowMs": 900000, "maxRequests": 300 }
+  "rateLimit": {
+    "windowMs": 900000,
+    "maxRequests": 1000
+  }
 }

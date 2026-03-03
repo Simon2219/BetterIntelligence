@@ -1,16 +1,16 @@
-/**
+﻿/**
  * Seed - Default admin user for BetterIntelligence
  */
 const bcrypt = require('bcryptjs');
-const { UserSystem } = require('./Database');
+const { UserRepository } = require('./index');
 
 async function seedAdminUser(log) {
     const email = process.env.ADMIN_EMAIL || 'admin@betterintelligence.com';
-    if (UserSystem.getByEmail(email)) return;
+    if (UserRepository.getByEmail(email)) return;
 
     if (log) log.info('Creating default admin user');
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'AdminPass123!', 12);
-    UserSystem.create({
+    UserRepository.create({
         email,
         username: process.env.ADMIN_USERNAME || 'admin',
         displayName: 'Admin',
@@ -22,3 +22,4 @@ async function seedAdminUser(log) {
 }
 
 module.exports = { seedAdminUser };
+

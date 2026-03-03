@@ -1,0 +1,11 @@
+/* Toggle */
+.form-toggle { width: 2.75rem; height: 1.5rem; border-radius: 0.75rem; background: var(--border); cursor: pointer; position: relative; transition: background 0.2s; }
+.form-toggle--active { background: var(--accent); }
+.form-toggle__knob { width: 1.25rem; height: 1.25rem; border-radius: 50%; background: white; position: absolute; top: 0.125rem; left: 0.125rem; transition: transform 0.2s; }
+.form-toggle--active .form-toggle__knob { transform: translateX(1.25rem); }
+.flex-between { display: flex; justify-content: space-between; }
+
+/* Range */
+.form-range { flex: 1; accent-color: var(--accent); }
+.form-range-value { font-size: 0.9rem; font-weight: 600; color: var(--accent); min-width: 2rem; text-align: center; }
+

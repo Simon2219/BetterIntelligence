@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HooksService - Fire events to webhooks and emit over Socket.io
  * Events: message_received, agent_response, skill_invoked, deploy_request
  */
@@ -19,7 +19,22 @@ function register(event, url, enabled = true) {
 }
 
 function clear(event) {
-    _configs.delete(event);
+    if (event) _configs.delete(event);
+    else _configs.clear();
+}
+
+function loadFromDb() {
+    try {
+        const { HookConfigRepository } = require('../database');
+        clear();
+        const rows = HookConfigRepository.listAll();
+        for (const row of rows) {
+            if (row.event && row.url) register(row.event, row.url, row.enabled === 1);
+        }
+        log.info('Hooks loaded from DB', { count: rows.length });
+    } catch (err) {
+        log.warn('Failed to load hooks from DB', { err: err.message });
+    }
 }
 
 /**
@@ -35,10 +50,11 @@ async function fire(event, payload) {
             const u = new URL(url);
             const lib = u.protocol === 'https:' ? https : http;
             await new Promise((resolve, reject) => {
-                const req = lib.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (res) => {
+                const req = lib.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 10000 }, (res) => {
                     res.on('data', () => {});
                     res.on('end', resolve);
                 });
+                req.on('timeout', () => { req.destroy(); reject(new Error('Webhook timeout')); });
                 req.on('error', reject);
                 req.write(body);
                 req.end();
@@ -53,4 +69,6 @@ async function fire(event, payload) {
     }
 }
 
-module.exports = { init, fire, register, clear };
+module.exports = { init, fire, register, clear, loadFromDb };
+
+

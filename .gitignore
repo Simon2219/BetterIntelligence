@@ -6,6 +6,7 @@ data/media/*
 data/skills/workspace/*
 data/skills/installed/*
 data/logs/*
+comfyui/
 certs/
 !certs/README.md
 .env

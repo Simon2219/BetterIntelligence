@@ -1,0 +1,28 @@
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: var(--radius-sm); font-weight: 500; cursor: pointer; border: none; font-size: 0.95rem; transition: all 0.15s; text-decoration: none; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.875rem; }
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    color: white;
+    box-shadow: 0 0.625rem 1.375rem color-mix(in srgb, var(--accent) 34%, transparent);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-tonal {
+    background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+    color: var(--text-primary);
+    border: 0.0625rem solid var(--border);
+}
+.btn-tonal:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    transform: translateY(-0.0625rem);
+}
+.btn-ghost { background: transparent; color: var(--text-secondary); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-danger:hover:not(:disabled) { opacity: 0.9; }
+
+/* Reset buttons */
+.btn-reset { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.85rem; padding: 0 0.25rem; line-height: 1; opacity: 0.6; transition: opacity 0.15s; }
+.btn-reset:hover { opacity: 1; color: var(--accent); }

@@ -1,0 +1,16 @@
+/** Shared app scrollbars */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--accent) 62%, var(--accent-secondary)) transparent;
+}
+*::-webkit-scrollbar { width: 0.625rem; height: 0.625rem; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    border-radius: 62.4375rem;
+    border: 0.125rem solid transparent;
+    background-clip: padding-box;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 78%, white 8%) 0%, color-mix(in srgb, var(--accent-secondary) 74%, var(--accent)) 100%);
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 90%, white 10%) 0%, color-mix(in srgb, var(--accent-secondary) 86%, var(--accent)) 100%);
+}

@@ -1,10 +1,20 @@
-const jwt = require('jsonwebtoken');
+﻿const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Config = require('../../../config/Config');
-const { TokenSystem } = require('../database/Database');
+const { TokenRepository } = require('../database');
 
-function getAccessSecret() { return Config.get('auth.accessSecret', process.env.JWT_ACCESS_SECRET || 'bi-fallback'); }
-function getRefreshSecret() { return Config.get('auth.refreshSecret', process.env.JWT_REFRESH_SECRET || 'bi-refresh'); }
+function getAccessSecret() {
+    const secret = Config.get('auth.accessSecret', process.env.JWT_ACCESS_SECRET);
+    if (!secret) throw new Error('JWT access secret is not configured');
+    return secret;
+}
+
+function getRefreshSecret() {
+    const secret = Config.get('auth.refreshSecret', process.env.JWT_REFRESH_SECRET);
+    if (!secret) throw new Error('JWT refresh secret is not configured');
+    return secret;
+}
+
 function hashToken(t) { return crypto.createHash('sha256').update(t).digest('hex'); }
 
 function generateTokens(user) {
@@ -15,7 +25,7 @@ function generateTokens(user) {
     const accessToken = jwt.sign(payload, getAccessSecret(), { expiresIn: `${accessExp}m`, issuer: 'betterintelligence' });
     const refreshToken = jwt.sign({ userId: user.id, type: 'refresh' }, getRefreshSecret(), { expiresIn: `${refreshExp}d`, issuer: 'betterintelligence' });
 
-    TokenSystem.store(user.id, hashToken(refreshToken), new Date(Date.now() + refreshExp * 864e5).toISOString());
+    TokenRepository.store(user.id, hashToken(refreshToken), new Date(Date.now() + refreshExp * 864e5).toISOString());
     return { accessToken, refreshToken, expiresIn: accessExp * 60 };
 }
 
@@ -24,18 +34,37 @@ function verifyAccessToken(token) {
     catch { return null; }
 }
 
+function verifyRefreshToken(token) {
+    try {
+        const payload = jwt.verify(token, getRefreshSecret(), { issuer: 'betterintelligence' });
+        return payload?.type === 'refresh' ? payload : null;
+    } catch {
+        return null;
+    }
+}
+
 function refreshTokens(refreshToken, user) {
     try {
-        const p = jwt.verify(refreshToken, getRefreshSecret(), { issuer: 'betterintelligence' });
-        if (p.type !== 'refresh') return null;
-        const stored = TokenSystem.find(hashToken(refreshToken));
+        const p = verifyRefreshToken(refreshToken);
+        if (!p) return null;
+        const stored = TokenRepository.find(hashToken(refreshToken));
         if (!stored) return null;
-        TokenSystem.revoke(hashToken(refreshToken));
+        TokenRepository.revoke(hashToken(refreshToken));
         return generateTokens(user);
     } catch { return null; }
 }
 
-function revokeToken(t) { TokenSystem.revoke(hashToken(t)); }
-function revokeAllUserTokens(uid) { TokenSystem.revokeAllForUser(uid); }
+function revokeToken(t) { TokenRepository.revoke(hashToken(t)); }
+function revokeAllUserTokens(uid) { TokenRepository.revokeAllForUser(uid); }
 
-module.exports = { generateTokens, verifyAccessToken, refreshTokens, revokeToken, revokeAllUserTokens, hashToken };
+module.exports = {
+    generateTokens,
+    verifyAccessToken,
+    verifyRefreshToken,
+    refreshTokens,
+    revokeToken,
+    revokeAllUserTokens,
+    hashToken
+};
+
+

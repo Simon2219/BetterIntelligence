@@ -1,0 +1,50 @@
+/** Main content */
+.main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    min-width: 0;
+}
+
+.main__content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+/* Chat route must keep page static, only message panel scrolls */
+.main.main--chat {
+    overflow: hidden !important;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.main.main--chat .chat-hub {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+}
+
+.container {
+    max-width: 100%;
+    width: 100%;
+    margin: 0 auto;
+    padding: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.container--full {
+    max-width: none;
+    padding: clamp(1rem, 3vw, 2rem);
+}
+
+@media (max-width: 48em) {
+    .container { padding: 0.75rem 1rem; }
+    .container--full { padding: 1rem; }
+}
+
+@media (max-width: 23.5em) {
+    .container { padding: 0.6rem 0.65rem; }
+}

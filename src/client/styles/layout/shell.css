@@ -1,0 +1,24 @@
+/** Layout shell */
+.app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.app-body {
+    --main-sidebar-width: 13.75rem;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 52em) {
+    .app-body {
+        --main-sidebar-width: 4.5rem;
+    }
+}

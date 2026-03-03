@@ -4,17 +4,25 @@
   "description": "Build AI agents. Share skills. Deploy bots.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node start-https.js",
     "start:https": "node start-https.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node scripts/run-tests.js",
+    "test:appearance": "node scripts/test-appearance-api.js"
   },
-  "keywords": ["ai", "agents", "skills", "chatbot"],
+  "keywords": [
+    "ai",
+    "agents",
+    "skills",
+    "chatbot"
+  ],
   "license": "PROPRIETARY",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.6.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
+    "cropperjs": "^2.1.0",
     "dotenv": "^17.3.1",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",

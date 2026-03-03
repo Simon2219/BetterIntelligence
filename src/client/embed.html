@@ -5,20 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;background:#0a0a0f;color:#f0f0f5;min-height:100vh;display:flex;flex-direction:column}
-        #chat-header{padding:1rem;background:#12121a;border-bottom:1px solid #252535}
-        #chat-messages{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.75rem}
-        .msg{padding:0.75rem 1rem;border-radius:10px;max-width:85%}
-        .msg.user{align-self:flex-end;background:#6366f1}
-        .msg.assistant{align-self:flex-start;background:#16161f;border:1px solid #252535}
-        #chat-input{display:flex;gap:0.5rem;padding:1rem;background:#12121a;border-top:1px solid #252535}
-        #chat-input input{flex:1;padding:0.6rem 1rem;border-radius:8px;border:1px solid #252535;background:#16161f;color:#f0f0f5;font-size:1rem}
-        #chat-input input:focus{outline:none;border-color:#6366f1}
-        #chat-input button{padding:0.6rem 1.2rem;border-radius:8px;border:none;background:#6366f1;color:white;font-weight:500;cursor:pointer}
-        #chat-input button:disabled{opacity:0.5;cursor:not-allowed}
-    </style>
+    <link rel="stylesheet" href="/styles/views/embed.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -29,26 +16,70 @@
         <button id="send">Send</button>
     </div>
     <script>
-        const slug = location.pathname.split('/embed/')[1];
+        const slug = (location.pathname.split('/embed/')[1] || '').replace(/\/$/, '').trim();
         if (!slug) { document.body.innerHTML = '<p>Invalid embed</p>'; } else {
             const msgEl = document.getElementById('chat-messages');
             const inputEl = document.getElementById('input');
             const sendBtn = document.getElementById('send');
+            let conversationId = null;
+
             function addMsg(role, content) {
                 const d = document.createElement('div');
                 d.className = 'msg ' + role;
-                d.textContent = content;
+                d.textContent = content || '';
                 msgEl.appendChild(d);
                 msgEl.scrollTop = msgEl.scrollHeight;
             }
-            addMsg('assistant', 'Embed chat - connect via Socket.io with deploy namespace for full experience.');
+            function addImg(url) {
+                const wrap = document.createElement('div');
+                wrap.className = 'msg assistant';
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'generated';
+                img.style.cssText = 'max-width:100%;border-radius:8px;display:block';
+                wrap.appendChild(img);
+                msgEl.appendChild(wrap);
+                msgEl.scrollTop = msgEl.scrollHeight;
+            }
+
+            const socket = io('/deploy/' + slug);
+
+            socket.on('connect', () => {
+                msgEl.querySelector('.msg.assistant')?.remove();
+                addMsg('assistant', 'Connected. How can I help?');
+            });
+            socket.on('connect_error', (err) => {
+                addMsg('assistant', 'Could not connect. Try refreshing.');
+            });
+            socket.on('agent:error', (d) => addMsg('assistant', 'Error: ' + (d.error || 'Unknown')));
+            socket.on('conversation:created', (d) => { conversationId = d.conversationId; });
+            socket.on('agent:stream', (d) => {
+                if (d.chunk) {
+                    let last = msgEl.querySelector('.msg.streaming');
+                    if (!last) { last = document.createElement('div'); last.className = 'msg assistant streaming'; msgEl.appendChild(last); }
+                    last.textContent = (last.textContent || '') + d.chunk;
+                    msgEl.scrollTop = msgEl.scrollHeight;
+                }
+            });
+            socket.on('agent:done', (d) => {
+                const s = msgEl.querySelector('.msg.streaming');
+                if (s) s.classList.remove('streaming');
+                msgEl.scrollTop = msgEl.scrollHeight;
+                sendBtn.disabled = false;
+            });
+            socket.on('agent:media', (d) => {
+                (d.media || []).filter(m => m.url).forEach(m => addImg(m.url));
+            });
+
             sendBtn.addEventListener('click', () => {
                 const t = inputEl.value.trim();
                 if (!t) return;
                 addMsg('user', t);
                 inputEl.value = '';
-                addMsg('assistant', 'AI response will appear here when backend is wired.');
+                sendBtn.disabled = true;
+                socket.emit('deploy:message', { message: t, conversationId });
             });
+            socket.on('agent:error', () => { sendBtn.disabled = false; });
             inputEl.addEventListener('keypress', e => { if (e.key === 'Enter') sendBtn.click(); });
         }
     </script>

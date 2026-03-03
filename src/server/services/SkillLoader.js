@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SkillLoader - Load skills from filesystem (bundled, workspace, installed)
  * Precedence: workspace > installed > bundled
  */
@@ -46,12 +46,19 @@ function listSkillsForUser(userId) {
 
     const scanDir = (dir, source) => {
         if (!fs.existsSync(dir)) return;
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        let entries;
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return;
+        }
         for (const e of entries) {
             if (!e.isDirectory()) continue;
-            const skillPath = path.join(dir, e.name);
-            const skill = loadSkillFromDir(skillPath);
-            if (skill && !skills.has(skill.name)) skills.set(skill.name, { ...skill, slug: e.name, source });
+            try {
+                const skillPath = path.join(dir, e.name);
+                const skill = loadSkillFromDir(skillPath);
+                if (skill && !skills.has(skill.name)) skills.set(skill.name, { ...skill, slug: e.name, source });
+            } catch {}
         }
     };
 
@@ -74,9 +81,37 @@ function getSkillPath(userId, slug) {
     return null;
 }
 
-function getSkillsForContext(userId) {
-    const skills = listSkillsForUser(userId);
+function getSkillsForContext(userId, skillSlugs = null) {
+    let skills = listSkillsForUser(userId);
+    if (skillSlugs && Array.isArray(skillSlugs) && skillSlugs.length > 0) {
+        const set = new Set(skillSlugs.map(s => String(s).toLowerCase()));
+        skills = skills.filter(s => set.has((s.slug || s.name || '').toLowerCase()));
+        skills.sort((a, b) => {
+            const ia = skillSlugs.indexOf(a.slug || a.name);
+            const ib = skillSlugs.indexOf(b.slug || b.name);
+            return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+        });
+    }
     return skills.map(s => `## ${s.name}\n${s.description}\n\n${s.instructions}`).join('\n\n---\n\n');
 }
 
-module.exports = { listSkillsForUser, getSkillPath, loadSkillFromDir, getSkillsForContext, parseFrontmatter };
+function getSkillsForContextBySkillIds(skillIds, agentId) {
+    const { SkillRepository } = require('../database');
+    const base = path.resolve(Config.get('skills.basePath', './data/skills'));
+    const blocks = [];
+    for (const skillId of skillIds || []) {
+        if (!skillId) continue;
+        const skill = SkillRepository.getById(skillId);
+        if (!skill || !SkillRepository.agentCanUseSkill(agentId, skillId)) continue;
+        const fullPath = path.join(base, skill.path);
+        const loaded = loadSkillFromDir(fullPath);
+        if (loaded) {
+            blocks.push(`## ${loaded.name}\n${loaded.description}\n\n${loaded.instructions}`);
+        }
+    }
+    return blocks.length ? blocks.join('\n\n---\n\n') : '';
+}
+
+module.exports = { listSkillsForUser, getSkillPath, loadSkillFromDir, getSkillsForContext, getSkillsForContextBySkillIds, parseFrontmatter };
+
+

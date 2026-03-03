@@ -1,0 +1,9 @@
+/* Settings */
+.settings-title { margin-bottom: 1.5rem; }
+.settings-card { max-width: 30rem; }
+.settings-section { padding: 1rem 0; }
+.settings-section + .settings-section { border-top: 0.0625rem solid var(--border); }
+.settings-section__title { font-size: 1rem; margin-bottom: 0.5rem; }
+.settings-row { align-items: center; }
+.btn-block { width: 100%; justify-content: flex-start; }
+

@@ -1,5 +1,5 @@
-const jwtService = require('../services/jwtService');
-const { UserSystem } = require('../database/Database');
+﻿const jwtService = require('../services/jwtService');
+const { UserRepository, RoleRepository } = require('../database');
 
 function extractToken(req) {
     const h = req.headers?.authorization;
@@ -14,7 +14,7 @@ function authenticate(req, res, next) {
     const payload = jwtService.verifyAccessToken(token);
     if (!payload) return res.status(401).json({ success: false, error: 'Invalid or expired token' });
 
-    const user = UserSystem.getWithRole(payload.userId);
+    const user = UserRepository.getWithRole(payload.userId);
     if (!user) return res.status(401).json({ success: false, error: 'User not found' });
     if (!user.is_active) return res.status(403).json({ success: false, error: 'Account deactivated' });
 
@@ -27,17 +27,27 @@ function optionalAuth(req, res, next) {
     if (token) {
         const payload = jwtService.verifyAccessToken(token);
         if (payload) {
-            const user = UserSystem.getWithRole(payload.userId);
+            const user = UserRepository.getWithRole(payload.userId);
             if (user && user.is_active) req.user = user;
         }
     }
     next();
 }
 
-function requireAdmin(req, res, next) {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
-    if (!req.user.role?.is_admin) return res.status(403).json({ success: false, error: 'Admin required' });
-    next();
+function requirePermission(permission) {
+    return (req, res, next) => {
+        if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
+        if (RoleRepository.hasPermission(req.user.role, permission)) return next();
+        return res.status(403).json({ success: false, error: 'Permission denied' });
+    };
 }
 
-module.exports = { authenticate, optionalAuth, requireAdmin };
+function requireAdmin(req, res, next) {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
+    if (RoleRepository.hasPermission(req.user.role, 'can_access_admin') || req.user.role?.is_admin) return next();
+    return res.status(403).json({ success: false, error: 'Admin required' });
+}
+
+module.exports = { authenticate, optionalAuth, requirePermission, requireAdmin };
+
+

@@ -1,11 +1,33 @@
-const express = require('express');
+﻿const express = require('express');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 const Config = require('../../../config/Config');
-const { UserSystem } = require('../database/Database');
+const { UserRepository } = require('../database');
 const jwtService = require('../services/jwtService');
+const socketSessionRegistry = require('../services/socketSessionRegistry');
 const log = require('../services/Logger')('auth');
 const { authenticate } = require('../middleware/auth');
+
+function getRefreshCookieOptions(withMaxAge = true) {
+    const opts = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
+    };
+    if (withMaxAge) {
+        opts.maxAge = Config.get('auth.refreshTokenExpiryDays', 30) * 864e5;
+    }
+    return opts;
+}
+
+function setRefreshCookie(res, refreshToken) {
+    res.cookie('refresh_token', refreshToken, getRefreshCookieOptions(true));
+}
+
+function clearRefreshCookie(res) {
+    res.clearCookie('refresh_token', getRefreshCookieOptions(false));
+}
 
 function sanitizeUser(u) {
     if (!u) return null;
@@ -29,11 +51,11 @@ router.post('/signup', async (req, res) => {
         const minLen = Config.get('auth.passwordMinLength', 8);
         if (password.length < minLen) return res.status(400).json({ success: false, error: `Password min ${minLen} chars` });
 
-        if (UserSystem.getByEmail(email)) return res.status(409).json({ success: false, error: 'Email taken' });
-        if (UserSystem.getByUsername(username)) return res.status(409).json({ success: false, error: 'Username taken' });
+        if (UserRepository.getByEmail(email)) return res.status(409).json({ success: false, error: 'Email taken' });
+        if (UserRepository.getByUsername(username)) return res.status(409).json({ success: false, error: 'Username taken' });
 
         const hash = await bcrypt.hash(password, 12);
-        const userId = UserSystem.create({
+        const createdUser = UserRepository.create({
             email: email.toLowerCase().trim(),
             username: username.trim(),
             displayName: displayName.trim(),
@@ -42,15 +64,20 @@ router.post('/signup', async (req, res) => {
             settings: { theme: 'dark' }
         });
 
-        const user = UserSystem.getByEmail(email);
+        const user = UserRepository.getByEmail(email);
         const tokens = jwtService.generateTokens(user);
 
-        res.cookie('refresh_token', tokens.refreshToken, {
-            httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
-            maxAge: Config.get('auth.refreshTokenExpiryDays', 30) * 864e5
-        });
+        setRefreshCookie(res, tokens.refreshToken);
 
-        res.status(201).json({ success: true, data: { userId, accessToken: tokens.accessToken, expiresIn: tokens.expiresIn, user: sanitizeUser(user) } });
+        res.status(201).json({
+            success: true,
+            data: {
+                userId: createdUser?.id || null,
+                accessToken: tokens.accessToken,
+                expiresIn: tokens.expiresIn,
+                user: sanitizeUser(user)
+            }
+        });
     } catch (err) {
         log.error('Signup error', { err: err.message });
         res.status(500).json({ success: false, error: 'Signup failed' });
@@ -62,7 +89,7 @@ router.post('/login', async (req, res) => {
         const { login, password } = req.body;
         if (!login || !password) return res.status(400).json({ success: false, error: 'Login and password required' });
 
-        let user = UserSystem.getByEmail(login) || UserSystem.getByUsername(login);
+        let user = UserRepository.getByEmail(login) || UserRepository.getByUsername(login);
         if (!user) return res.status(401).json({ success: false, error: 'Invalid credentials' });
         if (!user.is_active) return res.status(403).json({ success: false, error: 'Account deactivated' });
 
@@ -70,13 +97,10 @@ router.post('/login', async (req, res) => {
         if (!valid) return res.status(401).json({ success: false, error: 'Invalid credentials' });
 
         const tokens = jwtService.generateTokens(user);
-        res.cookie('refresh_token', tokens.refreshToken, {
-            httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
-            maxAge: Config.get('auth.refreshTokenExpiryDays', 30) * 864e5
-        });
+        setRefreshCookie(res, tokens.refreshToken);
 
-        UserSystem.setOnline(user.id, true);
-        const full = UserSystem.getWithRole(user.id);
+        UserRepository.setOnline(user.id, true);
+        const full = UserRepository.getWithRole(user.id);
         res.json({ success: true, data: { accessToken: tokens.accessToken, expiresIn: tokens.expiresIn, user: sanitizeUser(full) } });
     } catch (err) {
         log.error('Login error', { err: err.message });
@@ -86,44 +110,58 @@ router.post('/login', async (req, res) => {
 
 router.post('/refresh', (req, res) => {
     try {
-        const rt = req.cookies?.refresh_token || req.body.refreshToken;
+        const rt = req.cookies?.refresh_token;
         if (!rt) return res.status(401).json({ success: false, error: 'Refresh token required' });
 
-        const decoded = require('jsonwebtoken').decode(rt);
-        if (!decoded?.userId) return res.status(401).json({ success: false, error: 'Invalid token' });
+        const refreshPayload = jwtService.verifyRefreshToken(rt);
+        if (!refreshPayload?.userId) return res.status(401).json({ success: false, error: 'Invalid token' });
 
-        const user = UserSystem.getById(decoded.userId);
+        const user = UserRepository.getById(refreshPayload.userId);
         if (!user) return res.status(401).json({ success: false, error: 'User not found' });
 
         const tokens = jwtService.refreshTokens(rt, user);
         if (!tokens) return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' });
 
-        res.cookie('refresh_token', tokens.refreshToken, {
-            httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
-            maxAge: Config.get('auth.refreshTokenExpiryDays', 30) * 864e5
-        });
+        setRefreshCookie(res, tokens.refreshToken);
 
-        const full = UserSystem.getWithRole(user.id);
+        const full = UserRepository.getWithRole(user.id);
         res.json({ success: true, data: { accessToken: tokens.accessToken, expiresIn: tokens.expiresIn, user: sanitizeUser(full) } });
     } catch (err) {
         res.status(500).json({ success: false, error: 'Refresh failed' });
     }
 });
 
-router.post('/logout', authenticate, (req, res) => {
+router.post('/logout', (req, res) => {
     try {
-        if (req.cookies?.refresh_token) jwtService.revokeToken(req.cookies.refresh_token);
-        res.clearCookie('refresh_token');
-        res.json({ success: true });
-    } catch {
+        const rt = req.cookies?.refresh_token;
+        if (rt) {
+            jwtService.revokeToken(rt);
+        }
+    } catch (err) {
+        log.warn('Logout revoke failed', { err: err.message });
+    } finally {
+        clearRefreshCookie(res);
         res.json({ success: true });
     }
 });
 
+router.post('/logout-all', authenticate, (req, res) => {
+    try {
+        jwtService.revokeAllUserTokens(req.user.id);
+        socketSessionRegistry.disconnectUserSockets(req.user.id);
+        clearRefreshCookie(res);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Logout-all failed' });
+    }
+});
+
 router.get('/session', authenticate, (req, res) => {
-    const full = UserSystem.getWithRole(req.user.id);
+    const full = UserRepository.getWithRole(req.user.id);
     res.json({ success: true, data: { user: sanitizeUser(full) } });
 });
 
 module.exports = router;
 module.exports.sanitizeUser = sanitizeUser;
+
+

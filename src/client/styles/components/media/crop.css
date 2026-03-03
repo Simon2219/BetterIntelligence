@@ -1,0 +1,79 @@
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   IMAGE CROP VIEW (full-screen dedicated crop using Cropper.js)
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.image-crop-view {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+}
+.image-crop-view__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    padding-top: calc(1rem + env(safe-area-inset-top, 0));
+    background: var(--bg-secondary);
+    border-bottom: 0.0625rem solid var(--border);
+    flex-shrink: 0;
+}
+.image-crop-view__close {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.image-crop-view__close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+.image-crop-view__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+.image-crop-view__area {
+    flex: 1;
+    min-height: 12.5rem;
+    height: 50vh;
+    max-height: calc(100vh - 10rem);
+    background: #0a0a0f;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.image-crop-view__area cropper-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 12.5rem;
+    --theme-color: var(--accent);
+}
+.image-crop-view__area cropper-shade {
+    filter: blur(0.1875rem);
+}
+.image-crop-view__area cropper-selection {
+    outline: 0.25rem solid var(--accent) !important;
+    outline-offset: 0;
+}
+.image-crop-view__area img.image-crop-view__img {
+    display: none;
+}
+.image-crop-view__info {
+    padding: 1rem 1.5rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0));
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-align: center;
+    flex-shrink: 0;
+}
+

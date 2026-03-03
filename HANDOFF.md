@@ -1,108 +1,353 @@
-# Agent Handoff — BetterIntelligence
+# HANDOFF_AI_CONTEXT
 
-**For the next agent:** Read this file first. It summarizes the project state, where to find the plan, and what remains.
+## 0) MACHINE-READABLE METADATA
 
----
-
-## Plan Files (Read These First)
-
-The implementation plan lives in **Cursor's plan storage**. Look at:
-
-1. **Primary plan (phases, schema, architecture):**
-   - `C:\Users\Simon\.cursor\plans\betterintelligence_implementation_4e0041ad.plan.md`
-   - Contains: OpenClaw analysis, repo setup, implementation phases (1–8), architecture diagram, file structure, WebSocket vs REST decision, skills filesystem layout, MVP functionality (Part 6d), UI/UX guidelines (Part 6e)
-
-2. **Plan update (clarifications, additions):**
-   - `C:\Users\Simon\.cursor\plans\betterintelligence_—_plan_update_(architecture,_skills,_mvp_detail,_ui)_6ac55b47.plan.md`
-   - Contains: WebSocket decision rationale, filesystem-first skills, missing functionality (conversation history, chat view, skill edit, deploy API), enriched MVP descriptions, UI guidelines, execution order
-
----
-
-## Project Location
-
-- **Repo:** `S:\Projects\BetterIntelligence`
-- **RealChat (source):** `S:\Projects\RealChat\RealChat` — foundation was copied from here; do not edit RealChat.
-
----
-
-## What Is Implemented (MVP Status)
-
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1: Core schema, auth, filesystem | Done | DB migrations, roles, users, ai_agents, conversations, messages, skill_registry, agent_deployments, hook_configs |
-| Phase 2: WebSocket layer, Hooks | Done | gatewaySocket.js, HooksService.js; agent:invoke → agent:stream → agent:done |
-| Phase 3: Agent Builder | Done | Agent list (cards), create/edit form; not full stepper UI |
-| Phase 4: Skills system | Done | SkillLoader, filesystem (bundled/workspace/installed), precedence |
-| Phase 5: Skill Author | Done | Create/edit skills via UI, writes SKILL.md |
-| Phase 6: Skills Hub | Done | Browse bundled, install to installed/{userId}/ |
-| Phase 7: Bot deployment | Done | Create deployment, embed page at /embed/:slug |
-| Phase 8: Chat, history, onboarding | Done | Chat view, conversation selector, 3-step onboarding wizard |
-
-**AI runtime:** The `agent:invoke` handler returns a placeholder response. The AI provider (Ollama/OpenAI) is not wired yet — see plan for AIMiddleware/ContextBuilder integration.
+```yaml
+project:
+  name: BetterIntelligence
+  repo_root: "S:/Projects/BetterIntelligence"
+  source_reference_repo: "S:/Projects/RealChat/RealChat"
+  primary_branch: main
+  stack:
+    backend: ["Node.js", "Express", "Socket.io", "better-sqlite3"]
+    frontend: ["Vanilla JS SPA", "CSS"]
+    ai: ["Ollama", "ComfyUI", "OpenAI-compatible providers"]
+  runtime:
+    start_script: "npm start"
+    https_entry: "start-https.js"
+    env_file: ".env"
+  important_local_docs:
+    - "SYSTEMS.md"
+    - "TEST_RESULTS.md"
+    - "HANDOFF.md"
+plans:
+  implementation_master:
+    - "C:/Users/Simon/.cursor/plans/betterintelligence_implementation_4e0041ad.plan.md"
+    - "C:/Users/Simon/.cursor/plans/betterintelligence_—_plan_update_(architecture,_skills,_mvp_detail,_ui)_6ac55b47.plan.md"
+  chat_media_layout_plan:
+    - "C:/Users/Simon/.cursor/plans/chat_view_media_and_layout_fixes_0596efe6.plan.md"
+state:
+  overall_mvp: implemented
+  chat_media_layout_work: implemented_with_recent_regression_fixes
+  requires_manual_validation: true
+```
 
 ---
 
-## Architecture Summary
+## 1) SYSTEM GOALS (CURRENT PRIORITIES)
 
-- **REST:** Auth, users, agents, skills, conversations, deploy, hub
-- **Socket.io (WebSocket):** agent:invoke, agent:stream, agent:done, chat:typing, hooks:event
-- **Skills:** Filesystem-first; `data/skills/bundled/`, `workspace/{userId}/`, `installed/{userId}/`; DB (`skill_registry`) is index only
-- **Hooks:** HooksService.fire(event, payload) → POST to webhooks + emit over Socket.io
-
----
-
-## Key Files to Know
-
-| Path | Purpose |
-|------|---------|
-| `server.js` | Express + Socket.io, routes, skills init |
-| `src/server/database/Database.js` | Schema, migrations, Systems |
-| `src/server/socket/gatewaySocket.js` | Socket.io auth, agent:invoke handler |
-| `src/server/services/SkillLoader.js` | Load skills from filesystem |
-| `src/server/services/HooksService.js` | Fire webhooks + emit hooks:event |
-| `src/server/routes/` | auth, users, agents, skills, conversations, deploy, hub |
-| `src/client/js/app.js` | SPA router, all views (landing, auth, agents, skills, hub, deploy, chat) |
-| `config/default.json` | Default config |
+1. Keep BetterIntelligence parity with planned architecture (agents + skills + chat + deployment + AI providers).
+2. Ensure chat UX is production-stable:
+   - only message pane scrolls in chat view
+   - sidebar has no horizontal overflow
+   - media upload/crop/view flow works end-to-end
+3. Preserve RealChat-inspired media behavior while adapting to BetterIntelligence architecture.
+4. Keep AI context behavior consistent: media in history should be represented as placeholders (`[image]`, `[video]`) for text models.
 
 ---
 
-## What's Not Done (Per Plan)
+## 2) REFERENCE BASELINE: REALCHAT (DO NOT EDIT)
 
-1. **AI integration** — Wire AIMiddleware/ContextBuilder from RealChat or equivalent; connect agent:invoke to real model calls (Ollama/OpenAI)
-2. **Deploy namespace** — `/deploy/:slug` Socket.io namespace for anonymous embed chat
-3. **Agent Builder stepper** — Full step progression: Identity → Personality → Tools → Model → Test (current form is single-page)
-4. **Tool/skill selector** — Multi-select skills per agent with drag-to-reorder
-5. **Hub publish** — Publish workspace skills to `skill_registry`; marketplace listing
-6. **Deploy API** — `POST /api/deploy/:slug/chat` for programmatic access; API key, rate limiting
-7. **GitHub repo** — Create `Simon2219/BetterIntelligence` on GitHub and push; user must create manually or use `gh auth login` + `gh repo create`
+Use RealChat as implementation reference for media UX/components:
+
+- `S:/Projects/RealChat/RealChat/src/client/js/components/MediaViewer.js`
+- `S:/Projects/RealChat/RealChat/src/client/js/components/MediaUploadPreview.js`
+- `S:/Projects/RealChat/RealChat/src/client/js/components/ImageCropView.js`
+- `S:/Projects/RealChat/RealChat/src/client/styles/views.css` (media-related sections)
+- `S:/Projects/RealChat/RealChat/server.js` (`/lib/cropperjs` static serving pattern)
+
+Constraint: RealChat is source reference only; do not modify it.
 
 ---
 
-## Run Locally
+## 3) ARCHITECTURE SNAPSHOT (PARSE-ORIENTED)
+
+### Backend
+
+- Entry: `server.js`
+- Static:
+  - `src/client` served as SPA assets
+  - `/media` served from configured media storage path
+  - `/lib/cropperjs` served from `node_modules/cropperjs/dist`
+- API namespaces:
+  - `/api/auth`, `/api/users`, `/api/agents`, `/api/skills`, `/api/chats`, `/api/deploy`, `/api/hub`, `/api/ai`, `/api/knowledge`, `/api/analytics`, `/api/admin`, `/api/appearance`, `/api/roles`, `/api/user/private-tags`, `/api/media`
+- Sockets:
+  - `src/server/socket/gatewaySocket.js` (authenticated chat/agent events)
+  - `src/server/socket/deploySocket.js` (embed/deploy channel)
+  - `src/server/socket/notificationsSocket.js` (user notifications)
+  - `src/server/socket/adminSocket.js` (admin model/provider realtime)
+  - `src/server/socket/analyticsSocket.js` (live analytics updates)
+
+### Frontend
+
+- SPA root: `src/client/js/app.js`
+- Style layers:
+  - `styles/variables.css`
+  - `styles/base.css`
+  - `styles/layout.css`
+  - `styles/components.css`
+  - `styles/views.css`
+- Media components:
+  - `src/client/js/components/MediaViewer.js`
+  - `src/client/js/components/MediaUploadPreview.js`
+  - `src/client/js/components/ImageCropView.js`
+
+### AI Pipeline
+
+- Context assembly: `src/server/ai/context/ContextBuilder.js`
+- Execution boundary: `src/server/ai/execution/AIExecution.js`
+- Providers: `src/server/ai/providers/*`
+
+---
+
+## 4) CHAT/MEDIA/LAYOUT PLAN STATUS (DETAILED)
+
+Source plan: `chat_view_media_and_layout_fixes_0596efe6.plan.md`
+
+### 4.1 Sidebar overflow + sizing
+
+Implemented:
+- `src/client/styles/views.css`
+  - `.chat-hub__sidebar` uses `overflow-x: hidden`
+  - additional overflow guards on chat hub/list/item row
+  - truncation present for name/preview/group-name
+- `src/client/js/app.js`
+  - chat sidebar resize max width constrained against available hub width
+
+### 4.2 Chat scroll containment (messages-only scroll)
+
+Implemented with iterative fixes:
+- `src/client/styles/layout.css`
+  - `.main.main--chat` enforces hidden overflow
+  - chat hub constrained in flex chain
+  - app layout/body overflow constrained
+- `src/client/styles/views.css`
+  - chat main/agent-chat/messages configured for `min-height: 0` + proper flex behavior
+- `src/client/styles/base.css`
+  - viewport/root overflow behavior adjusted to avoid full-page scroll leakage
+- `src/client/js/app.js`
+  - route render sets/removes `main--chat` class based on path
+
+### 4.3 Backend media support
+
+Implemented:
+- `src/server/routes/media.js`
+  - `POST /api/media/upload` (image + video, `chatId`, 25MB limit)
+  - `POST /api/media/capture` (base64 capture payload)
+- `src/server/services/mediaService.js`
+  - `saveBase64()`, `getFilePath()`, `exists()`
+  - media filename pattern with user/chat context
+  - returns `/media/...` URLs
+- `src/server/socket/gatewaySocket.js`
+  - `chat:send` accepts `mediaUrl` and `media[]`
+  - media messages persisted/emitted with type awareness
+  - AI pipeline invocation for media-aware messaging
+
+### 4.4 Client media components
+
+Implemented:
+- `MediaViewer` fullscreen carousel + keyboard/nav behavior
+- `MediaUploadPreview` modal + single-image crop path + multi-item carousel
+- `ImageCropView` using Cropper.js v2
+- Cropper served from `/lib/cropperjs`
+- Media-related CSS sections added in `views.css`
+- Added missing icons in `src/client/js/utils/dom.js` (`chevronLeft`, `chevronRight`, plus existing `paperclip`)
+
+### 4.5 Chat integration
+
+Implemented:
+- Attachment input/button in `renderChatView`
+- Upload flow:
+  - single image + crop -> `/api/media/capture`
+  - file upload -> `/api/media/upload`
+  - emit `chat:send` with media payload
+- `renderChatMessage` supports media rendering
+- click handlers open `MediaViewer`
+- `chat:message` media handling and dedupe logic present
+- `agent:media` rendering updated to clickable media message structure
+
+### 4.6 AI context placeholders
+
+Implemented:
+- `src/server/ai/context/ContextBuilder.js`
+  - history mapping includes media message types
+  - placeholders injected (`[image]`, `[video]`, or per-item)
+
+---
+
+## 5) RECENTLY ADDRESSED REGRESSION TOPICS
+
+These items were explicitly reported and then patched:
+
+1. Chat page still scrolling globally instead of message area only.
+2. Agent-generated images not opening preview on click.
+3. Crop->Send flow not reliably surfacing upload failures/sends.
+4. Crop behavior direction changed: image fixed, crop rectangle movable/resizable, free ratio (non-circle).
+5. Crop initial view tuning:
+   - `cropper-image initial-center-size="contain"`
+   - center fit call after init (`$center('contain')`) for large-image downscale and small-image non-upscale behavior.
+
+Important: treat these as "patched but must be manually verified in running UI".
+
+---
+
+## 6) CURRENT MEDIA CROP DESIGN CONTRACT
+
+`src/client/js/components/ImageCropView.js` intended behavior:
+
+- Rectangle mode:
+  - free aspect ratio crop selection
+  - selection movable + resizable
+  - image intended to initialize centered with contain-fit semantics
+- Circle mode:
+  - 1:1 selection enforced
+  - output masked to circular JPEG
+- Export:
+  - via `selection.$toCanvas()`
+  - JPEG output quality 0.92
+
+---
+
+## 7) SYSTEMS INVENTORY (CANONICAL)
+
+Use `SYSTEMS.md` as canonical inventory of:
+
+- Auth + users
+- Agent CRUD
+- AI provider registry/status
+- ContextBuilder/AIExecution flow
+- Gateway/deploy/notifications/admin/analytics sockets
+- Chats/messages
+- Skills FS + hub
+- Knowledge ingestion/chunking
+- Analytics event logging
+- Deployment/embed pipeline
+- Hooks/event dispatch
+- Logging subsystem
+
+If uncertain about endpoint ownership, resolve via `SYSTEMS.md` first.
+
+Availability source-of-truth:
+- `src/server/services/agentAvailabilityService.js` is canonical for `modelStatuses[]` + `modelStatus`.
+- Agents and Chats payloads should reuse this service (no duplicated route-local inference logic).
+
+---
+
+## 8) VALIDATION STATUS
+
+From `TEST_RESULTS.md`:
+- historical programmatic checks reported passing
+- multiple manual verification items still listed
+
+Additional required manual validation after chat/media/layout patches:
+
+```yaml
+manual_validation_required:
+  - chat_scroll_isolated_to_messages: true
+  - chat_sidebar_no_horizontal_scroll: true
+  - click_agent_generated_image_opens_media_viewer: true
+  - single_image_crop_send_emits_chat_media_message: true
+  - cropper_initial_center_contain_behavior:
+      no_upscale_small_images: true
+      downscale_large_images_preserving_ratio: true
+      selection_move_resize_works: true
+```
+
+---
+
+## 9) CRITICAL FILE MAP FOR NEXT AGENT
+
+### Frontend high-priority
+
+- `src/client/js/app.js`
+  - route handling + `main--chat` class application
+  - `renderChatHub`
+  - `renderChatView`
+  - media upload flow
+  - media click handling
+  - `renderChatMessage`
+- `src/client/js/components/ImageCropView.js`
+- `src/client/js/components/MediaUploadPreview.js`
+- `src/client/js/components/MediaViewer.js`
+- `src/client/js/utils/dom.js`
+- `src/client/styles/base.css`
+- `src/client/styles/layout.css`
+- `src/client/styles/views.css`
+
+### Backend high-priority
+
+- `server.js`
+- `src/server/routes/media.js`
+- `src/server/services/mediaService.js`
+- `src/server/services/agentAvailabilityService.js`
+- `src/server/services/realtimeBus.js`
+- `src/server/socket/gatewaySocket.js`
+- `src/server/socket/notificationsSocket.js`
+- `src/server/socket/adminSocket.js`
+- `src/server/socket/analyticsSocket.js`
+- `src/server/ai/context/ContextBuilder.js`
+
+---
+
+## 10) KNOWN IMPLEMENTATION RISKS
+
+1. **Scroll containment is CSS-chain sensitive**  
+   Any change to `height/min-height/overflow/flex` in `base.css`, `layout.css`, or `views.css` can reintroduce page-level scroll.
+
+2. **Media click path depends on markup shape**  
+   Event delegation expects `.chat-msg__media-thumb` / `.chat-msg__image` and parent `.chat-msg` dataset payloads.
+
+3. **Cropper API is web-component based (v2)**  
+   Minor template attribute changes can alter interaction semantics dramatically.
+
+4. **Large base64 capture payloads**  
+   Works within configured JSON limit; failures should surface via toast/error paths.
+
+---
+
+## 11) OPERATIONAL RUNBOOK
 
 ```bash
 cd S:\Projects\BetterIntelligence
 npm install
-cp .env.example .env
 npm start
 ```
 
-Default admin: `admin@betterintelligence.com` / `AdminPass123!`
+Default local assumptions:
+
+- HTTPS dev entry active through `start-https.js`
+- `/lib/cropperjs/*` available from server static config
+- `/media/*` available and writable from configured media path
 
 ---
 
-## Plan Sections Reference
+## 12) NEXT-AGENT EXECUTION PROTOCOL
 
-From the main plan file:
+1. Read this file.
+2. Read `SYSTEMS.md`.
+3. Read `C:/Users/Simon/.cursor/plans/chat_view_media_and_layout_fixes_0596efe6.plan.md`.
+4. Reproduce chat/media UI in running app before changing code.
+5. Validate reported behavior in this order:
+   - scroll containment
+   - sidebar overflow
+   - media click preview
+   - crop send flow
+   - crop contain centering semantics
+6. Make minimal targeted edits; avoid broad CSS refactors.
+7. Re-run manual checks.
+8. Update this handoff with exact residual failures (if any).
 
-- **Part 1:** OpenClaw analysis
-- **Part 2:** Repo setup (already done)
-- **Part 3:** Implementation phases (1–8)
-- **Part 4:** Architecture diagram (mermaid)
-- **Part 5:** File structure
-- **Part 6b:** WebSocket vs REST decision
-- **Part 6c:** Skills storage (filesystem)
-- **Part 6d:** Complete MVP functionality
-- **Part 6e:** UI/UX guidelines
-- **Part 7:** Execution order
-- **Part 8:** Out of scope
+---
+
+## 13) SUCCESS CRITERIA FOR THIS HANDOFF THREAD
+
+```yaml
+done_when:
+  - chat_window_containerized_and_page_not_scrolling_in_chat: true
+  - sidebar_no_horizontal_scroll: true
+  - image_and_video_preview_click_path_works: true
+  - single_image_crop_send_path_works: true
+  - cropper_initial_view_is_centered_contain:
+      no_upscale_small_images: true
+      downscale_large_images: true
+```

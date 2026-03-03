@@ -1,0 +1,5 @@
+/* Onboarding */
+.onboarding-card { max-width: 30rem; margin: 4rem auto; }
+.onboarding-step-title { margin-bottom: 0.75rem; }
+.onboarding-actions { display: flex; gap: 0.5rem; margin-top: 1.5rem; }
+
