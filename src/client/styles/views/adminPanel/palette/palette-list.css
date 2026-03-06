@@ -1,0 +1,141 @@
+﻿.admin-editor-section {
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 84%, transparent);
+    border-radius: 0.68rem;
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    padding: 0.62rem;
+    display: grid;
+    gap: 0.54rem;
+}
+
+.admin-editor-section__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.admin-editor-section__header h4 {
+    margin: 0;
+    font-size: 0.86rem;
+    line-height: 1.1;
+}
+
+.admin-palette-create {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.44rem;
+    align-items: center;
+}
+
+.admin-palette-create__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    flex-wrap: wrap;
+}
+
+.admin-palette-list {
+    display: grid;
+    gap: 0.42rem;
+    max-height: 15rem;
+    overflow-y: auto;
+    padding-right: 0.18rem;
+}
+
+.admin-palette-list--collapsed {
+    display: none;
+}
+
+.admin-palette {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.34rem;
+    align-items: stretch;
+}
+
+.admin-palette__body {
+    appearance: none;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 86%, transparent);
+    border-radius: 0.58rem;
+    background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+    color: var(--text-primary);
+    padding: 0.46rem 0.52rem;
+    display: grid;
+    gap: 0.3rem;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.admin-palette--active .admin-palette__body {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+}
+
+.admin-palette__name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-palette__swatches {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.24rem;
+}
+
+.admin-palette__swatch {
+    width: 0.94rem;
+    height: 0.94rem;
+    border-radius: 0.26rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.admin-palette__delete {
+    appearance: none;
+    border: 0.0625rem solid color-mix(in srgb, var(--danger) 42%, var(--border));
+    border-radius: 0.54rem;
+    background: color-mix(in srgb, var(--danger) 12%, var(--bg-secondary));
+    color: color-mix(in srgb, var(--danger) 84%, var(--text-primary));
+    min-width: 1.86rem;
+    padding: 0 0.45rem;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.admin-palette__delete:hover {
+    border-color: color-mix(in srgb, var(--danger) 64%, var(--border));
+    background: color-mix(in srgb, var(--danger) 18%, var(--bg-secondary));
+}
+
+.admin-palette--dragging {
+    opacity: 0.56;
+}
+
+.admin-palette--over .admin-palette__body {
+    border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.admin-palette-edit-name {
+    display: grid;
+    gap: 0.18rem;
+}
+
+.admin-palette-edit-name__value {
+    font-size: 0.96rem;
+    font-weight: 700;
+    line-height: 1.12;
+}
+
+@media (max-width: 47.5em) {
+    :root .admin-palette-create {
+        grid-template-columns: 1fr;
+    }
+}
+

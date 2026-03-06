@@ -1,0 +1,114 @@
+/* chat custom scrollbar */
+.agent-chat__scrollbar {
+    position: absolute;
+    top: 0;
+    right: 0.2rem;
+    bottom: 0;
+    width: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.16s ease;
+    z-index: 2;
+}
+
+.agent-chat__scrollbar--active {
+    opacity: 1;
+}
+
+.agent-chat__scrollbar--hidden {
+    opacity: 0 !important;
+    visibility: hidden;
+}
+
+.agent-chat__scroll-track {
+    position: relative;
+    width: 0.8rem;
+    height: 100%;
+    margin: 0.25rem 0 0;
+    border-radius: 62.4375rem;
+    background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+    box-shadow: inset 0 0 0 0.0625rem color-mix(in srgb, var(--border) 68%, transparent);
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+.agent-chat__scroll-thumb {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    min-height: 1.5rem;
+    border: none;
+    border-radius: 62.4375rem;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, #fff), color-mix(in srgb, var(--accent-secondary) 78%, var(--accent)));
+    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--accent) 36%, transparent);
+    cursor: grab;
+    touch-action: none;
+}
+
+.agent-chat__scroll-thumb:active {
+    cursor: grabbing;
+}
+
+.agent-chat__scroll-label {
+    position: absolute;
+    right: 1.05rem;
+    top: 0;
+    transform: translateY(0);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.3rem;
+    max-width: 5.2rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 62.4375rem;
+    background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 78%, transparent);
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.agent-chat__scroll-jump {
+    width: 1.7rem;
+    height: 1.7rem;
+    margin-bottom: 0.4rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--accent) 36%, var(--border));
+    border-radius: 62.4375rem;
+    background: color-mix(in srgb, var(--bg-card) 96%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    cursor: pointer;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.92);
+    transition: opacity 0.16s ease, transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.agent-chat__scroll-jump:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+}
+
+.agent-chat__scroll-jump--visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.agent-chat__scroll-jump-icon {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 0.125rem solid currentColor;
+    border-bottom: 0.125rem solid currentColor;
+    transform: rotate(45deg) translateY(-0.08rem);
+}

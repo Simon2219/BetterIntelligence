@@ -105,16 +105,18 @@ Rule:
 
 ## 5) Frontend Architecture
 ### App Shell
-- `src/client/js/app.js` (routing + shell + cross-view wiring)
+- `src/client/js/app.js` (thin app entrypoint)
+- `src/client/js/core/bootstrap.js` (composition root: wiring, routing, lifecycle)
 - `src/client/js/core/socketClients.js` (shared namespace socket manager)
-- `src/client/js/core/appearanceClient.js`
+- `src/client/js/core/clientAppearance.js`
 
 ### Views
-- `src/client/js/views/chatView.js`
-- `src/client/js/views/agentsView.js`
-- `src/client/js/views/adminView.js`
+- `src/client/js/views/chat/chatMainView.js`
+- `src/client/js/views/agents/agentsMainView.js`
+- `src/client/js/views/admin/adminPanelView.js`
+- `src/client/js/views/deploy/deployMainView.js`
 - `src/client/js/views/analyticsView.js`
-- `src/client/js/views/*` (skills, hub, deploy, auth, settings, onboarding)
+- `src/client/js/views/*` (skills, hub, auth, settings, onboarding, app shell parts)
 
 ### Shared UI + Utilities
 - `src/client/js/components/*`
@@ -123,12 +125,9 @@ Rule:
 - `src/client/js/utils/dragdrop.js`
 
 ### Styles
-- `src/client/styles/variables.css`
-- `src/client/styles/base.css`
-- `src/client/styles/layout.css`
-- `src/client/styles/components.css`
-- `src/client/styles/views.css`
-- `src/client/styles/views/chat.css`
+- `src/client/styles/StyleManifest.css` (single app stylesheet entrypoint)
+- `src/client/styles/tokens/theme.css` (canonical token layer)
+- `src/client/styles/views/ChatView.css`
 
 ## 6) Cross-System Contracts
 1. Agent availability must be server-derived (`agentAvailabilityService`) and reused in Agents/Chat/Hub payloads.

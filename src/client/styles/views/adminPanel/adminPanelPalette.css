@@ -1,0 +1,12 @@
+/* Admin palette */
+@import url('./palette/theme-switch.css');
+@import url('./palette/assignments.css');
+@import url('./palette/palette-list.css');
+@import url('./palette/color-editor.css');
+@import url('./palette/picker-popover.css');
+
+.admin-colors {
+    display: grid;
+    gap: 0.88rem;
+    grid-template-columns: minmax(0, 1fr);
+}

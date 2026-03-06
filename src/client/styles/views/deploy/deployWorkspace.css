@@ -1,0 +1,206 @@
+.deploy-workspace__header {
+    display: grid;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.deploy-workspace__header-main {
+    display: grid;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.deploy-workspace__title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.deploy-workspace__title {
+    margin: 0;
+    font-size: 1.45rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deploy-workspace__subtitle {
+    color: var(--text-secondary);
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.deploy-workspace__tabs {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.deploy-workspace__tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.deploy-workspace__tab {
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    color: var(--text-secondary);
+    border-radius: 62.4375rem;
+    padding: 0.35rem 0.72rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.deploy-workspace__tab--active {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.deploy-workspace__content,
+.deploy-overview,
+.deploy-stats {
+    display: grid;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.deploy-overview__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.375rem, 1fr));
+    gap: 0.75rem;
+}
+
+.deploy-stat-card {
+    display: grid;
+    gap: 0.35rem;
+    align-content: center;
+    min-height: 5.625rem;
+}
+
+.deploy-stat-card__value {
+    font-size: clamp(1.05rem, 2vw, 1.45rem);
+    font-weight: 800;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.deploy-stat-card__label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.deploy-overview__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18.125rem), 1fr));
+    gap: 0.85rem;
+    min-width: 0;
+}
+
+.deploy-overview__card {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.deploy-overview__card-title {
+    margin: 0;
+}
+
+.deploy-link-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.deploy-link-row__value {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0.42rem 0.6rem;
+    border: 0.0625rem solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+}
+
+.deploy-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.deploy-switch-row__label {
+    font-weight: 600;
+}
+
+.deploy-switch-row__hint {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.deploy-switch {
+    width: 3.25rem;
+    height: 1.75rem;
+    border-radius: 62.4375rem;
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    padding: 0;
+    position: relative;
+    cursor: pointer;
+}
+
+.deploy-switch__knob {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.17s ease;
+}
+
+.deploy-switch--on {
+    border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.deploy-switch--on .deploy-switch__knob {
+    transform: translateX(1.5rem);
+}
+
+.deploy-config-form__actions,
+.deploy-member__actions,
+.deploy-operator-form__actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 52em) {
+    :root .deploy-link-row {
+        grid-template-columns: 1fr;
+    }
+
+    :root .deploy-workspace__title {
+        font-size: 1.2rem;
+    }
+
+    :root .deploy-stats__toolbar,
+    :root .deploy-switch-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+

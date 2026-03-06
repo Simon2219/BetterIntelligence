@@ -1,0 +1,33 @@
+/* chat group availability rails/alerts */
+.chat-hub__group--warning .chat-hub__group-rail {
+    opacity: 1;
+    border-right: 0.0625rem solid color-mix(in srgb, var(--warning) 40%, var(--border));
+    box-shadow:
+        inset 0.125rem 0 0.1875rem color-mix(in srgb, #000 20%, transparent),
+        inset -0.0625rem 0 0 color-mix(in srgb, #fff 8%, transparent),
+        0.0625rem 0 0.125rem color-mix(in srgb, #000 14%, transparent);
+}
+.chat-hub__group--warning .chat-hub__group-rail::before {
+    background: color-mix(in srgb, var(--warning) 18%, transparent);
+}
+.chat-hub__group--error .chat-hub__group-rail {
+    opacity: 1;
+    border-right: 0.0625rem solid color-mix(in srgb, var(--danger) 42%, var(--border));
+    box-shadow:
+        inset 0.125rem 0 0.1875rem color-mix(in srgb, #000 22%, transparent),
+        inset -0.0625rem 0 0 color-mix(in srgb, #fff 7%, transparent),
+        0.0625rem 0 0.125rem color-mix(in srgb, #000 16%, transparent);
+}
+.chat-hub__group--error .chat-hub__group-rail::before {
+    background: color-mix(in srgb, var(--danger) 19%, transparent);
+}
+.chat-hub__group-alert--warning {
+    border-color: color-mix(in srgb, var(--warning) 42%, var(--border));
+    color: color-mix(in srgb, var(--warning) 80%, var(--text-primary));
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.chat-hub__group-alert--error {
+    border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+    color: color-mix(in srgb, var(--danger) 82%, var(--text-primary));
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+}

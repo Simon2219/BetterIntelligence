@@ -1,0 +1,212 @@
+﻿.deploy-chats {
+    display: grid;
+    grid-template-columns: minmax(16.25rem, 21.25rem) minmax(0, 1fr);
+    gap: 0.85rem;
+}
+
+.deploy-chats__sidebar,
+.deploy-chats__thread {
+    display: grid;
+    gap: 0.65rem;
+    min-height: 26.25rem;
+}
+
+.deploy-chats__list,
+.deploy-thread__messages {
+    display: grid;
+    gap: 0.45rem;
+    max-height: 68vh;
+    overflow: auto;
+}
+
+.deploy-chat-row {
+    width: 100%;
+    text-align: left;
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 0.58rem;
+    color: inherit;
+    cursor: pointer;
+    display: grid;
+    gap: 0.32rem;
+}
+
+.deploy-chat-row--selected {
+    border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.deploy-chat-row__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+}
+
+.deploy-chat-row__id {
+    font-weight: 700;
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.deploy-chat-row__time,
+.deploy-chat-row__preview {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.deploy-thread__header,
+.deploy-chats__sidebar-head,
+.deploy-access__header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.deploy-thread__header h3,
+.deploy-chats__sidebar-head h3,
+.deploy-access__header-row h3,
+.deploy-timeline h4,
+.deploy-stats__toolbar h3 {
+    margin: 0;
+}
+
+.deploy-operator-form {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.deploy-access,
+.deploy-members-list,
+.deploy-member-search-results {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.deploy-member-search-form {
+    display: grid;
+    grid-template-columns: minmax(11.25rem, 1fr) auto;
+    gap: 0.5rem;
+}
+
+.deploy-member,
+.deploy-member-search-result {
+    border: 0.0625rem solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+    padding: 0.6rem;
+    display: grid;
+    gap: 0.55rem;
+}
+
+.deploy-member__identity {
+    display: grid;
+    gap: 0.1rem;
+}
+
+.deploy-member__role,
+.deploy-member-search-result__actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.deploy-role-pill,
+.deploy-perm-toggle,
+.deploy-range-btn {
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    color: var(--text-secondary);
+    border-radius: 62.4375rem;
+    padding: 0.3rem 0.62rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.deploy-role-pill--active,
+.deploy-perm-toggle--on,
+.deploy-range-btn--active {
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.deploy-permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.38rem;
+}
+
+.deploy-stats__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.deploy-stats__range {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.deploy-timeline__table {
+    display: grid;
+    gap: 0.36rem;
+}
+
+.deploy-timeline__row {
+    display: grid;
+    grid-template-columns: 1.3fr repeat(5, minmax(0, 1fr));
+    gap: 0.45rem;
+    padding: 0.44rem 0.5rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 74%, transparent);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+}
+
+.deploy-timeline__row--head {
+    border-style: dashed;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+@media (max-width: 70em) {
+    :root .deploy-chats {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 52em) {
+    :root .deploy-member-search-form,
+    :root .deploy-permissions-grid,
+    :root .deploy-timeline__row {
+        grid-template-columns: 1fr;
+    }
+
+    :root .deploy-chats__sidebar,
+    :root .deploy-chats__thread {
+        min-height: 0;
+    }
+
+    :root .deploy-chats__list {
+        max-height: 38vh;
+    }
+
+    :root .deploy-thread__messages {
+        max-height: 48vh;
+    }
+
+    :root .deploy-operator-form__actions .btn,
+    :root .deploy-member__actions .btn,
+    :root .deploy-member-search-result__actions .btn {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+

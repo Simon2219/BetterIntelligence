@@ -1,0 +1,53 @@
+/* chat group flap + chevron */
+.chat-hub__group-flap {
+    position: absolute;
+    left: var(--chat-group-flap-left);
+    bottom: -0.0625rem;
+    width: var(--chat-group-flap-width);
+    min-height: 1.56rem;
+    border-radius: 0.56rem 0.56rem 0.34rem 0.34rem;
+    border: 0.0625rem solid color-mix(in srgb, #000 28%, var(--border));
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    box-shadow:
+        inset 0 0.125rem 0.25rem color-mix(in srgb, #000 34%, transparent),
+        inset 0 -0.0625rem 0.125rem color-mix(in srgb, #000 24%, transparent),
+        inset 0.0625rem 0 0.125rem color-mix(in srgb, #000 20%, transparent),
+        inset -0.0625rem 0 0.125rem color-mix(in srgb, #000 20%, transparent);
+    pointer-events: none;
+    z-index: 2;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.chat-hub__group-header[aria-expanded="true"] .chat-hub__group-flap {
+    transform: translateY(0.125rem);
+}
+.chat-hub__group-chevron {
+    --chev-rotate: 45deg;
+    --chev-base-y: 0;
+    width: 0.46rem;
+    height: 0.46rem;
+    display: inline-block;
+    border-right: 0.1125rem solid var(--text-muted);
+    border-bottom: 0.1125rem solid var(--text-muted);
+    transform: translateY(var(--chev-base-y)) rotate(var(--chev-rotate));
+    transform-origin: center;
+    animation: none;
+}
+.chat-hub__group-chevron--expanded {
+    --chev-rotate: -135deg;
+    --chev-base-y: 0.0625rem;
+    animation: chat-hub-chevron-pop 0.2s cubic-bezier(0.16, 0.84, 0.3, 1);
+}
+.chat-hub__group-chevron--collapsed {
+    --chev-rotate: 45deg;
+    --chev-base-y: 0;
+    animation: chat-hub-chevron-pop 0.2s cubic-bezier(0.16, 0.84, 0.3, 1);
+}
+@keyframes chat-hub-chevron-pop {
+    0% { transform: translateY(var(--chev-base-y)) rotate(var(--chev-rotate)); }
+    45% { transform: translateY(calc(var(--chev-base-y) + 0.1875rem)) rotate(var(--chev-rotate)); }
+    100% { transform: translateY(var(--chev-base-y)) rotate(var(--chev-rotate)); }
+}

@@ -1,0 +1,65 @@
+/* model-row status */
+.admin-model-row__statuses { display: grid; gap: 0.4rem; }
+.admin-model-row__status-group {
+    display: grid;
+    grid-template-rows: auto auto auto;
+    gap: 0.4rem;
+    padding: 0.62rem;
+    border: 0.0625rem solid var(--border);
+    border-radius: 0.5625rem;
+    background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+    min-height: auto;
+}
+.admin-model-row__status-group .admin-model-row__statuses { margin-top: 0; }
+.admin-model-row__status-title {
+    font-size: clamp(0.86rem, 0.36vw + 0.74rem, 1.08rem);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+}
+.admin-status-pill {
+    border: 0.0625rem solid var(--border);
+    border-radius: 62.4375rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 0.48rem 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.34rem;
+    min-width: 7.5rem;
+    width: 100%;
+    cursor: pointer;
+    font-size: clamp(0.8rem, 0.36vw + 0.68rem, 1.03rem);
+    font-weight: 700;
+    transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.admin-status-pill:hover {
+    transform: translateY(-0.0625rem);
+}
+.admin-status-pill__dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.admin-status-pill--on {
+    border-color: color-mix(in srgb, var(--success) 42%, var(--border));
+    color: var(--success);
+    background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+.admin-status-pill--on .admin-status-pill__dot {
+    background: var(--success);
+    box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--success) 24%, transparent);
+}
+.admin-status-pill--off {
+    border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.admin-status-pill--off .admin-status-pill__dot {
+    background: var(--danger);
+    box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--danger) 24%, transparent);
+}

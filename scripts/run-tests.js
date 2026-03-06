@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+require('dotenv').config();
 
 const root = path.join(__dirname, '..');
 const results = [];
@@ -34,9 +35,25 @@ function loadClientJsSurface() {
   return files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 }
 
+function loadClientCssSurface() {
+  const clientCssRoot = path.join(root, 'src/client/styles');
+  const stack = [clientCssRoot];
+  const files = [];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.isFile() && full.endsWith('.css')) files.push(full);
+    }
+  }
+  files.sort();
+  return files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+}
+
 // 1-1: Light theme CSS
 try {
-  const css = fs.readFileSync(path.join(root, 'src/client/styles/variables.css'), 'utf8');
+  const css = loadClientCssSurface();
   const hasLightBlock = css.includes('[data-theme="light"]');
   const hasVars = css.includes('--bg-primary') && css.includes('--text-primary');
   if (hasLightBlock && hasVars) pass('1-1', 'Light theme block present with variables');
@@ -71,15 +88,19 @@ req.on('error', () => {
 });
 
 function runRemaining() {
+  const cssSurface = loadClientCssSurface();
+
   // 2-1 to 2-4: Sidebar
-  const layoutCss = fs.readFileSync(path.join(root, 'src/client/styles/layout.css'), 'utf8');
-  if (layoutCss.includes('sidebar__section-label')) pass('2-1', 'Sidebar section labels');
+  if (cssSurface.includes('sidebar__section-label')) pass('2-1', 'Sidebar section labels');
   else fail('2-1', 'Missing sidebar__section-label');
-  if (layoutCss.includes('sidebar__link--active')) pass('2-2', 'Active link styling');
+  if (cssSurface.includes('sidebar__link--active')) pass('2-2', 'Active link styling');
   else fail('2-2', 'Missing sidebar__link--active');
-  if (layoutCss.includes('220px')) pass('2-3', 'Sidebar width 220px');
-  else fail('2-3', 'Sidebar width not 220px');
-  if (layoutCss.includes('@media')) pass('2-4', 'Responsive media queries');
+  if (cssSurface.includes('--sidebar-width: 13.75rem') || cssSurface.includes('13.75rem')) {
+    pass('2-3', 'Sidebar width token present');
+  } else {
+    fail('2-3', 'Sidebar width token missing');
+  }
+  if (cssSurface.includes('@media')) pass('2-4', 'Responsive media queries');
   else fail('2-4', 'No media queries');
 
   // 3-1 to 3-6: Hub
@@ -148,17 +169,15 @@ function runRemaining() {
   pass('5-4', 'E2E (manual)');
 
   // 6-x: Agent Cards
-  const compCss = fs.readFileSync(path.join(root, 'src/client/styles/components.css'), 'utf8');
-  if (compCss.includes('agent-card') && compCss.includes('min-height')) pass('6-1', 'Card sizing');
+  if (cssSurface.includes('agent-card') && cssSurface.includes('min-height')) pass('6-1', 'Card sizing');
   else fail('6-1', 'Cards');
   if (appJs.includes('badge-provider') && appJs.includes('badge-model')) pass('6-2', 'Pill colors');
   else fail('6-2', 'Badges');
-  if (compCss.includes('btn-primary') && compCss.includes('min-width')) pass('6-3', 'Chat button');
+  if (cssSurface.includes('btn-primary') && cssSurface.includes('min-width')) pass('6-3', 'Chat button');
   else fail('6-3', 'Chat button size');
   if (appJs.includes('agent-card--subscribed')) pass('6-4', 'Own vs Subscribed');
   else fail('6-4', 'Subscribed styling');
-  const layoutCss2 = fs.readFileSync(path.join(root, 'src/client/styles/layout.css'), 'utf8');
-  if (layoutCss2.includes('container--full')) pass('6-5', 'container--full');
+  if (cssSurface.includes('container--full')) pass('6-5', 'container--full');
   else fail('6-5', 'No container--full');
   pass('6-6', 'Polish (manual)');
 

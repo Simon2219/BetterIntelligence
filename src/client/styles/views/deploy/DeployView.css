@@ -1,0 +1,15 @@
+/* Deploy view */
+@import url('./deployList.css');
+@import url('./deployWorkspace.css');
+@import url('./deployChatsAccessStats.css');
+
+.deploy-screen {
+    display: grid;
+    gap: 1rem;
+}
+
+.deploy-workspace {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}

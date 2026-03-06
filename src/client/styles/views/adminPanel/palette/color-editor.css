@@ -1,0 +1,79 @@
+﻿.admin-color-grid {
+    display: grid;
+    gap: 0.52rem;
+}
+
+.admin-color-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(7.8rem, 1fr) minmax(6.5rem, auto);
+    align-items: center;
+    gap: 0.56rem;
+    padding: 0.54rem 0.58rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 84%, transparent);
+    border-radius: 0.6rem;
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+}
+
+.admin-color-row__swatch {
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 0.46rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 82%, transparent);
+    cursor: pointer;
+}
+
+.admin-color-row__meta {
+    display: grid;
+    gap: 0.14rem;
+    min-width: 0;
+}
+
+.admin-color-row__label {
+    font-size: 0.79rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+    text-transform: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-color-row__pick-btn {
+    appearance: none;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 1;
+    font-weight: 600;
+    width: fit-content;
+    padding: 0;
+    cursor: pointer;
+    transition: color 0.18s ease;
+}
+
+.admin-color-row__pick-btn:hover {
+    color: var(--accent);
+}
+
+.admin-color-row__hex {
+    max-width: 8.5rem;
+    justify-self: end;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    text-transform: uppercase;
+}
+
+@media (max-width: 47.5em) {
+    :root .admin-color-row {
+        grid-template-columns: auto minmax(7.5rem, 1fr);
+    }
+
+    :root .admin-color-row__hex {
+        grid-column: 1 / -1;
+        max-width: none;
+        justify-self: stretch;
+    }
+}
+

@@ -1,0 +1,154 @@
+/* chat group parent items */
+.chat-hub__group-header {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.72rem;
+    width: 100%;
+    padding: 0.86rem 0.92rem 0.8rem 1rem;
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        color-mix(in srgb, var(--accent) 6%, transparent) 50%,
+        transparent 100%
+    );
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    text-align: left;
+}
+.chat-hub__group-header:hover {
+    background:
+        linear-gradient(
+            180deg,
+            transparent 0%,
+            color-mix(in srgb, var(--accent) 8%, transparent) 50%,
+            transparent 100%
+        ),
+        color-mix(in srgb, var(--bg-hover) 78%, transparent);
+}
+.chat-hub__group-rail {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0.72rem;
+    border-radius: 0.4375rem 0 0 0.4375rem;
+    background: transparent;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+.chat-hub__group-rail::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+}
+.chat-hub__group-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.chat-hub__group-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "avatar identity unread"
+        "avatar pills unread";
+    align-items: start;
+    gap: 0.58rem;
+    position: static;
+    padding-bottom: 0.2rem;
+}
+.chat-hub__group-avatar {
+    grid-area: avatar;
+    width: auto;
+    height: 100%;
+    min-height: clamp(2rem, 2.2vw + 1.4rem, 2.45rem);
+    max-height: clamp(2rem, 2.2vw + 1.4rem, 2.45rem);
+    aspect-ratio: 1 / 1;
+    border-radius: 0.62rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 86%, transparent);
+    flex-shrink: 0;
+    object-fit: cover;
+    align-self: stretch;
+}
+.chat-hub__group-identity {
+    grid-area: identity;
+    min-width: 0;
+    display: grid;
+    gap: 0.24rem;
+    align-content: stretch;
+    min-height: clamp(2rem, 2.2vw + 1.4rem, 2.45rem);
+}
+.chat-hub__group-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.chat-hub__group-title-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.chat-hub__group-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 760;
+    font-size: 0.94rem;
+    color: var(--text-primary);
+}
+.chat-hub__group-activity-line {
+    width: 100%;
+    height: 0.1875rem;
+    border-radius: 62.4375rem;
+    background: color-mix(in srgb, var(--text-muted) 56%, transparent);
+}
+.chat-hub__group-activity-line--ok {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--success) 88%, #fff), color-mix(in srgb, var(--success) 56%, transparent));
+}
+.chat-hub__group-activity-line--warning {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--warning) 88%, #fff), color-mix(in srgb, var(--warning) 56%, transparent));
+}
+.chat-hub__group-activity-line--error {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--danger) 88%, #fff), color-mix(in srgb, var(--danger) 56%, transparent));
+}
+.chat-hub__group-chat-count {
+    font-size: 0.71rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 82%, transparent);
+    border-radius: 62.4375rem;
+    padding: 0.14rem 0.5rem;
+    background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.chat-hub__group-unread {
+    grid-area: unread;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.42rem;
+    border-radius: 62.4375rem;
+    min-width: 1.125rem;
+    text-align: center;
+    align-self: start;
+}
+.chat-hub__group-header {
+    padding-top: 0.82rem;
+    padding-bottom: 0.76rem;
+}

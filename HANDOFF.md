@@ -1,4 +1,4 @@
-# HANDOFF_AI_CONTEXT
+﻿# HANDOFF_AI_CONTEXT
 
 ## 0) MACHINE-READABLE METADATA
 
@@ -23,7 +23,7 @@ project:
 plans:
   implementation_master:
     - "C:/Users/Simon/.cursor/plans/betterintelligence_implementation_4e0041ad.plan.md"
-    - "C:/Users/Simon/.cursor/plans/betterintelligence_—_plan_update_(architecture,_skills,_mvp_detail,_ui)_6ac55b47.plan.md"
+    - "C:/Users/Simon/.cursor/plans/betterintelligence_â€”_plan_update_(architecture,_skills,_mvp_detail,_ui)_6ac55b47.plan.md"
   chat_media_layout_plan:
     - "C:/Users/Simon/.cursor/plans/chat_view_media_and_layout_fixes_0596efe6.plan.md"
 state:
@@ -82,11 +82,9 @@ Constraint: RealChat is source reference only; do not modify it.
 
 - SPA root: `src/client/js/app.js`
 - Style layers:
-  - `styles/variables.css`
-  - `styles/base.css`
-  - `styles/layout.css`
-  - `styles/components.css`
-  - `styles/views.css`
+  - `styles/StyleManifest.css`
+  - `styles/tokens/theme.css`
+  - `styles/views/ChatView.css` (chat view ownership)
 - Media components:
   - `src/client/js/components/MediaViewer.js`
   - `src/client/js/components/MediaUploadPreview.js`
@@ -107,7 +105,7 @@ Source plan: `chat_view_media_and_layout_fixes_0596efe6.plan.md`
 ### 4.1 Sidebar overflow + sizing
 
 Implemented:
-- `src/client/styles/views.css`
+- `src/client/styles/views/ChatView.css`
   - `.chat-hub__sidebar` uses `overflow-x: hidden`
   - additional overflow guards on chat hub/list/item row
   - truncation present for name/preview/group-name
@@ -117,13 +115,13 @@ Implemented:
 ### 4.2 Chat scroll containment (messages-only scroll)
 
 Implemented with iterative fixes:
-- `src/client/styles/layout.css`
+- `src/client/styles/StyleManifest.css`
   - `.main.main--chat` enforces hidden overflow
   - chat hub constrained in flex chain
   - app layout/body overflow constrained
-- `src/client/styles/views.css`
+- `src/client/styles/views/ChatView.css`
   - chat main/agent-chat/messages configured for `min-height: 0` + proper flex behavior
-- `src/client/styles/base.css`
+- `src/client/styles/StyleManifest.css`
   - viewport/root overflow behavior adjusted to avoid full-page scroll leakage
 - `src/client/js/app.js`
   - route render sets/removes `main--chat` class based on path
@@ -150,7 +148,7 @@ Implemented:
 - `MediaUploadPreview` modal + single-image crop path + multi-item carousel
 - `ImageCropView` using Cropper.js v2
 - Cropper served from `/lib/cropperjs`
-- Media-related CSS sections added in `views.css`
+- Media-related CSS sections added in `ChatView.css`
 - Added missing icons in `src/client/js/utils/dom.js` (`chevronLeft`, `chevronRight`, plus existing `paperclip`)
 
 ### 4.5 Chat integration
@@ -270,9 +268,8 @@ manual_validation_required:
 - `src/client/js/components/MediaUploadPreview.js`
 - `src/client/js/components/MediaViewer.js`
 - `src/client/js/utils/dom.js`
-- `src/client/styles/base.css`
-- `src/client/styles/layout.css`
-- `src/client/styles/views.css`
+- `src/client/styles/StyleManifest.css`
+- `src/client/styles/views/ChatView.css`
 
 ### Backend high-priority
 
@@ -292,7 +289,7 @@ manual_validation_required:
 ## 10) KNOWN IMPLEMENTATION RISKS
 
 1. **Scroll containment is CSS-chain sensitive**  
-   Any change to `height/min-height/overflow/flex` in `base.css`, `layout.css`, or `views.css` can reintroduce page-level scroll.
+   Any change to `height/min-height/overflow/flex` in `StyleManifest.css` or chat view owner files can reintroduce page-level scroll.
 
 2. **Media click path depends on markup shape**  
    Event delegation expects `.chat-msg__media-thumb` / `.chat-msg__image` and parent `.chat-msg` dataset payloads.
@@ -351,3 +348,5 @@ done_when:
       no_upscale_small_images: true
       downscale_large_images: true
 ```
+
+

@@ -1,1 +1,1 @@
-import './core/app/bootstrap.js';
+import './core/bootstrap.js';

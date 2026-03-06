@@ -1,0 +1,66 @@
+﻿.topbar__profile { position: relative; }
+
+.topbar__avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    border: 0.125rem solid var(--border);
+}
+
+.topbar__avatar--fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+}
+
+.topbar__avatar-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.topbar__dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    min-width: 11.25rem;
+    background: var(--bg-card);
+    border: 0.0625rem solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    z-index: 200;
+    padding: 0.5rem 0;
+}
+
+.topbar__dropdown--hidden { display: none; }
+
+.topbar__dropdown a,
+.topbar__dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: left;
+}
+
+.topbar__dropdown a:hover,
+.topbar__dropdown button:hover {
+    background: var(--bg-hover);
+}
+
+.topbar__dropdown button[data-action="logout"] { color: var(--danger); }
+

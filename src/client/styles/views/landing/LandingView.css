@@ -1,0 +1,28 @@
+/* Landing view layout */
+.landing {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+}
+
+.landing h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.landing p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    max-width: 30rem;
+}
+
+.landing .btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}

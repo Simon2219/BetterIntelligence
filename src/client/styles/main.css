@@ -1,6 +1,0 @@
-/** Legacy entry forwards to layered manifests. */
-@import url('./tokens/theme.css');
-@import url('./base.css');
-@import url('./layout.css');
-@import url('./components.css');
-@import url('./views.css');

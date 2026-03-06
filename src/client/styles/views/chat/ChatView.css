@@ -1,0 +1,12 @@
+/* Chat view */
+@import url('./chatRoot.css');
+@import url('./chatSidebar.css');
+@import url('./chatGroups.css');
+@import url('./chatChildItems.css');
+@import url('./chatThread.css');
+@import url('./chatTopBar.css');
+@import url('./chatMessagePane.css');
+@import url('./chatComposerBar.css');
+@import url('./chatScrollbar.css');
+@import url('./chatStatus.css');
+@import url('./chatMedia.css');

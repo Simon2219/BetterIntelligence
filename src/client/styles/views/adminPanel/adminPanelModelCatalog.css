@@ -1,0 +1,73 @@
+/* Admin model catalog */
+@import url('./modelCatalog/catalog-stats.css');
+@import url('./modelCatalog/provider-sections.css');
+@import url('./modelCatalog/modelRow.css');
+@import url('./modelCatalog/usageTiles.css');
+@import url('./modelCatalog/charts.css');
+@import url('./modelCatalog/controls.css');
+
+:root {
+    --ai-model-font-2xs: clamp(0.56rem, 0.16vw + 0.52rem, 0.7rem);
+    --ai-model-font-xs: clamp(0.62rem, 0.22vw + 0.56rem, 0.8rem);
+    --ai-model-font-sm: clamp(0.72rem, 0.3vw + 0.64rem, 0.96rem);
+    --ai-model-font-md: clamp(0.84rem, 0.44vw + 0.72rem, 1.14rem);
+    --ai-model-number-sm: clamp(0.94rem, 0.78vw + 0.72rem, 1.7rem);
+    --ai-model-number-md: clamp(1.08rem, 1.18vw + 0.78rem, 2.3rem);
+    --ai-model-number-lg: clamp(1.2rem, 2.1vw + 0.72rem, 3.34rem);
+}
+
+.admin-models {
+    display: grid;
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.admin-models__toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.admin-models__toolbar--stats {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: flex-end;
+    margin: 0 0 0.6rem;
+}
+
+.admin-models__filters {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.admin-models__filter {
+    display: grid;
+    gap: 0.22rem;
+}
+
+.admin-models__label {
+    font-size: clamp(0.66rem, 0.2vw + 0.6rem, 0.76rem);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    font-weight: 700;
+}
+
+@media (max-width: 47.5em) {
+    .admin-models__toolbar--stats {
+        align-items: stretch;
+        gap: 0.55rem;
+    }
+
+    .admin-models__filters {
+        width: auto;
+    }
+
+    .admin-models__filter {
+        flex: 1;
+        min-width: 7.5rem;
+    }
+}

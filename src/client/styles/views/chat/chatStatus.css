@@ -1,0 +1,38 @@
+/* chat status chips/banners */
+.agent-chat__health-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 62.4375rem;
+    border: 0.0625rem solid var(--border);
+    padding: 0.08rem 0.4rem;
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: var(--bg-card);
+}
+.agent-chat__health-chip--ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 38%, var(--border)); }
+.agent-chat__health-chip--warning { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 42%, var(--border)); }
+.agent-chat__health-chip--error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); }
+.agent-chat__model-status {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.8rem;
+    border-bottom: 0.0625rem solid var(--border);
+}
+.agent-chat__model-status--warning {
+    color: color-mix(in srgb, var(--warning) 82%, var(--text-primary));
+    background: color-mix(in srgb, var(--warning) 14%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+.agent-chat__model-status--error {
+    color: color-mix(in srgb, var(--danger) 84%, var(--text-primary));
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+}
+.agent-chat__typing { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.25rem; font-size: 0.85rem; color: var(--text-muted); }
+.typing-dot { width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--text-muted); animation: typingBounce 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-0.25rem); } }
+
+/* Error banner */
+.agent-chat__error { padding: 0.5rem 1.25rem; background: rgba(239, 68, 68, 0.1); color: var(--danger); font-size: 0.85rem; border-top: 0.0625rem solid rgba(239, 68, 68, 0.2); }

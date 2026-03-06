@@ -1,0 +1,154 @@
+/* model-catalog stats */
+.admin-models__stats { display: grid; gap: 0.7rem; }
+.admin-models__stats--wide {
+    grid-template-columns: minmax(18rem, 34%) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.68rem;
+}
+.admin-models__stats-cluster {
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 88%, transparent);
+    border-radius: 0.625rem;
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    padding: 0.44rem 0.5rem;
+    display: grid;
+    gap: 0.24rem;
+    width: 100%;
+    max-width: 100%;
+}
+.admin-models__stats-cluster--health {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    gap: 0.35rem;
+}
+.admin-models__stats-cluster-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    min-height: 1rem;
+}
+.admin-models__stats-cluster-title {
+    font-size: clamp(0.86rem, 0.55vw + 0.68rem, 1.08rem);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1;
+}
+.admin-models__stats-cluster--usage {
+    gap: 0.18rem;
+    padding-top: 0.24rem;
+    padding-bottom: 0.3rem;
+    grid-template-rows: minmax(0, 1fr) auto;
+}
+.admin-models__stats-cluster--usage .admin-models__stats-cluster-head {
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    align-items: center;
+    gap: 0.46rem;
+    align-self: stretch;
+}
+.admin-models__stats-cluster--usage .admin-models__stats-group--volume {
+    margin-top: 0;
+    gap: 0.72rem;
+    align-items: stretch;
+    align-self: end;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
+}
+.admin-models__stats-cluster--usage .admin-model-stat__split-grid {
+    min-height: clamp(4.6rem, 10vw, 9.4rem);
+}
+.admin-models__stats-cluster--usage .admin-model-stat__split-cell {
+    padding: clamp(0.64rem, 1.35vw, 1.32rem) clamp(0.18rem, 0.3vw, 0.36rem) clamp(0.5rem, 1.1vw, 1.08rem);
+}
+.admin-models__stats-cluster--usage .admin-model-stat__split-cell strong {
+    font-size: var(--ai-model-number-lg);
+}
+.admin-models__stats-cluster--usage .admin-model-stat__total-value {
+    font-size: clamp(1.28rem, 2.34vw + 0.7rem, 3.55rem);
+}
+.admin-models__usage-window.form-input--sm {
+    padding: 0.34rem 0.74rem;
+    font-size: var(--ai-model-font-sm);
+    line-height: 1.18;
+    min-height: clamp(1.86rem, 2.2vw, 2.18rem);
+}
+.admin-models__usage-window {
+    min-width: 7.875rem;
+    max-width: 9.25rem;
+}
+.admin-models__stats-header {
+    margin-bottom: 0.25rem;
+}
+.admin-models__stats-title {
+    white-space: nowrap;
+}
+.admin-models__toolbar--stats-inline {
+    justify-content: flex-start;
+    align-items: flex-end;
+    gap: 0.55rem;
+}
+
+@media (max-width: 67.5em) {
+    .admin-models__stats--wide {
+        grid-template-columns: 1fr;
+        gap: 0.56rem;
+    }
+
+    .admin-models__stats-cluster {
+        padding: 0.36rem 0.42rem;
+    }
+
+    .admin-models__stats-group--compact {
+        grid-template-columns: 1fr;
+        gap: 0.36rem;
+    }
+
+    .admin-models__stats-group--volume {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.4rem;
+    }
+
+    .admin-models__stats-cluster-title {
+        font-size: clamp(0.84rem, 0.34vw + 0.72rem, 1rem);
+    }
+}
+
+@media (max-width: 47.5em) {
+    .admin-models__stats-cluster {
+        width: 100%;
+    }
+
+    .admin-models__stats--wide {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-models__stats-group {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .admin-models__stats-group--compact {
+        grid-template-columns: 1fr;
+        gap: 0.32rem;
+    }
+
+    .admin-models__stats-group--volume {
+        grid-template-columns: 1fr;
+        gap: 0.34rem;
+    }
+
+    .admin-models__stats-cluster-head {
+        min-height: 1rem;
+    }
+
+    .admin-models__stats-cluster-title {
+        font-size: clamp(0.8rem, 0.26vw + 0.72rem, 0.94rem);
+        letter-spacing: 0.04em;
+    }
+
+}

@@ -1,0 +1,11 @@
+/* Admin settings tab */
+.admin-config-input[type="checkbox"] {
+    width: 1.04rem;
+    height: 1.04rem;
+    padding: 0;
+    accent-color: var(--accent);
+}
+
+.admin-config-input[type="number"] {
+    max-width: 10rem;
+}

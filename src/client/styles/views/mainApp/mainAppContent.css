@@ -1,0 +1,29 @@
+/** Main content */
+.main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    min-width: 0;
+}
+
+.main__content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+/* Chat route must keep page static, only message panel scrolls */
+.main.main--chat {
+    overflow: hidden !important;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.main.main--chat .chat-hub {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+}

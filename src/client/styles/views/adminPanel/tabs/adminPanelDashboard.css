@@ -1,0 +1,8 @@
+/* Admin dashboard tab */
+.admin-stat-value {
+    font-size: clamp(1.34rem, 1.2vw + 0.96rem, 2.15rem);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}

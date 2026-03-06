@@ -1,0 +1,8 @@
+/* chat thread shell */
+.agent-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 100%;
+    position: relative;
+}

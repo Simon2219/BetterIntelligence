@@ -1,0 +1,190 @@
+﻿/* Deploy view specific styles */
+.deploy-screen__actions {
+    gap: 0.7rem;
+}
+
+.deploy-search {
+    display: inline-grid;
+    grid-template-columns: minmax(13.75rem, 1fr) auto;
+    gap: 0.5rem;
+}
+
+.deploy-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+    gap: 0.85rem;
+}
+
+.deploy-list-card {
+    width: 100%;
+    text-align: left;
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+    border-radius: var(--radius);
+    padding: 0.95rem;
+    display: grid;
+    gap: 0.75rem;
+    cursor: pointer;
+    color: inherit;
+}
+
+.deploy-list-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    transform: translateY(-0.0625rem);
+}
+
+.deploy-list-card__head,
+.deploy-list-card__identity,
+.deploy-list-card__chips {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    justify-content: space-between;
+}
+
+.deploy-list-card__identity {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+
+.deploy-list-card__head {
+    flex-wrap: wrap;
+}
+
+.deploy-list-card__chips {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.deploy-list-card__slug {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 700;
+}
+
+.deploy-list-card__meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.deploy-list-card__meta-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.deploy-list-card__meta-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.deploy-role-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 62.4375rem;
+    padding: 0.12rem 0.48rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+    color: var(--text-secondary);
+}
+
+.deploy-role-badge--owner {
+    border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.deploy-role-badge--admin {
+    border-color: color-mix(in srgb, var(--info) 48%, var(--border));
+    color: var(--info);
+    background: color-mix(in srgb, var(--info) 11%, transparent);
+}
+
+.deploy-role-badge--manager {
+    border-color: color-mix(in srgb, var(--warning) 44%, var(--border));
+    color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 11%, transparent);
+}
+
+.deploy-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 62.4375rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.14rem 0.45rem;
+    border: 0.0625rem solid var(--border);
+}
+
+.deploy-chip--ok {
+    color: var(--success);
+    border-color: color-mix(in srgb, var(--success) 42%, var(--border));
+    background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.deploy-chip--off {
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+}
+
+.deploy-chip--subtle {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+}
+
+.deploy-create-panel {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.deploy-create-panel--hidden {
+    display: none;
+}
+
+.deploy-create-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+}
+
+.deploy-create-panel__title {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.deploy-create-form__actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 52em) {
+    :root .deploy-search {
+        grid-template-columns: 1fr;
+    }
+
+    :root .deploy-list {
+        grid-template-columns: 1fr;
+    }
+
+    :root .deploy-list-card__head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    :root .deploy-list-card__chips {
+        justify-content: flex-start;
+    }
+
+    :root .deploy-list-card__meta {
+        grid-template-columns: 1fr;
+    }
+}
+

@@ -1,0 +1,82 @@
+﻿.admin-assignments {
+    display: grid;
+    gap: 0.72rem;
+}
+
+.admin-assignments__group {
+    display: grid;
+    gap: 0.38rem;
+}
+
+.admin-assignments__tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.8rem), 1fr));
+    gap: 0.44rem;
+}
+
+.admin-assignment-tile {
+    appearance: none;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 88%, transparent);
+    border-radius: 0.62rem;
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+    color: var(--text-primary);
+    padding: 0.5rem 0.56rem;
+    display: grid;
+    gap: 0.38rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.admin-assignment-tile:hover {
+    border-color: color-mix(in srgb, var(--accent) 44%, var(--border));
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary));
+    transform: translateY(-0.0625rem);
+}
+
+.admin-assignment-tile--active {
+    border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary));
+    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.admin-assignment-tile__name {
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-assignment-tile__swatches {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.24rem;
+}
+
+.admin-assignments__actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.44rem;
+}
+
+@media (max-width: 67.5em) {
+    :root .admin-assignments__tiles {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.8rem), 1fr));
+    }
+}
+
+@media (max-width: 47.5em) {
+    :root .admin-assignments__actions {
+        justify-content: stretch;
+    }
+
+    :root .admin-assignments__actions .btn {
+        flex: 1;
+    }
+}
+

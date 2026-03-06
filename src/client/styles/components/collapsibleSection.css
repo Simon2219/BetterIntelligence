@@ -1,0 +1,53 @@
+/* Shared collapsible sections */
+.collapsible-section {
+    border: 0.0625rem solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+}
+
+.collapsible-section__header {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    list-style: none;
+    user-select: none;
+}
+
+.collapsible-section__header::marker {
+    content: '';
+}
+
+.collapsible-section__header::-webkit-details-marker {
+    display: none;
+}
+
+.collapsible-section__header::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 0.125rem solid color-mix(in srgb, var(--text-muted) 90%, transparent);
+    border-bottom: 0.125rem solid color-mix(in srgb, var(--text-muted) 90%, transparent);
+    transform: rotate(-45deg);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+details[open] > .collapsible-section__header::before {
+    transform: rotate(45deg);
+}
+
+.collapsible-section__header .badge {
+    margin-left: auto;
+}
+
+.collapsible-section__body {
+    padding: 1rem;
+    background: var(--bg-card);
+}

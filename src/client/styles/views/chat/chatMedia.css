@@ -1,0 +1,25 @@
+/* chat media message presentation */
+.chat-msg__media-thumb {
+    cursor: pointer;
+    max-width: 12.5rem;
+    max-height: 9.375rem;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.chat-msg__media-thumb--video {
+    max-width: 12.5rem;
+    max-height: 9.375rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+.chat-msg__media-thumb--video video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+}

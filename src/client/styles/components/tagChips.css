@@ -1,0 +1,52 @@
+/* Tag input and chips */
+.tag-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-height: 1.5rem;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-full);
+    background: var(--bg-secondary);
+    border: 0.0625rem solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.tag-chip--green {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: var(--success);
+}
+
+.tag-chip--red {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+}
+
+.tag-chip__remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.6;
+}
+
+.tag-chip__remove:hover {
+    opacity: 1;
+}

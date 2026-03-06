@@ -1,0 +1,35 @@
+﻿.admin-theme-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.18rem;
+    padding: 0.2rem;
+    border-radius: 62.4375rem;
+    border: 0.0625rem solid color-mix(in srgb, var(--border) 88%, transparent);
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+}
+
+.admin-theme-switch__btn {
+    appearance: none;
+    border: 0.0625rem solid transparent;
+    border-radius: 62.4375rem;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 0.34rem 0.7rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.admin-theme-switch__btn:hover {
+    color: var(--text-primary);
+}
+
+.admin-theme-switch__btn--active {
+    color: #fff;
+    border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 88%, #fff 0%), color-mix(in srgb, var(--accent-secondary) 86%, #fff 0%));
+}
+

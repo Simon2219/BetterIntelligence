@@ -1,0 +1,25 @@
+/* chat group separators */
+.chat-hub__group::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0.1875rem;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent) 14%, var(--border)) 0%,
+        color-mix(in srgb, var(--accent) 26%, var(--border)) 50%,
+        color-mix(in srgb, var(--accent) 14%, var(--border)) 100%
+    );
+    pointer-events: none;
+}
+.chat-hub__group--collapsed::after {
+    left: 0;
+}
+.chat-hub__group:has(.chat-hub__group-list--collapsed)::after {
+    left: 0;
+}
+.chat-hub__group--expanded::after {
+    left: 0;
+}

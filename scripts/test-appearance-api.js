@@ -3,6 +3,7 @@
  * Run: node scripts/test-appearance-api.js
  */
 const https = require('https');
+require('dotenv').config();
 const port = parseInt(process.env.PORT || '3000', 10);
 
 const req = https.get(

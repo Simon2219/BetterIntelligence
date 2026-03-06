@@ -1,0 +1,5 @@
+/* Main app shell view manifest */
+@import url('./mainAppShell.css');
+@import url('./mainAppTopBar.css');
+@import url('./mainAppSidebar.css');
+@import url('./mainAppContent.css');

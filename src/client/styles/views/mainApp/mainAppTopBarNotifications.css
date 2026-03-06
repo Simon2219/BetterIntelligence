@@ -1,0 +1,190 @@
+﻿.topbar__notifications {
+    position: relative;
+    margin-right: 0.7rem;
+}
+
+.topbar__icon-btn {
+    position: relative;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 0.75rem;
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.topbar__icon-btn:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+}
+
+.topbar__notif-badge {
+    position: absolute;
+    top: -0.3125rem;
+    right: -0.375rem;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 999rem;
+    padding: 0 0.25rem;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.66rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.topbar__notif-badge--hidden { display: none; }
+
+.topbar__dropdown--notifications {
+    width: min(34rem, calc(100vw - 1.5rem));
+    max-height: min(78vh, 38rem);
+    overflow: hidden;
+}
+
+.topbar__notifications-list {
+    display: flex;
+    flex-direction: column;
+    max-height: min(78vh, 38rem);
+    overflow-y: auto;
+}
+
+.topbar__notifications-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.58rem 0.72rem;
+    border-bottom: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-card) 96%, transparent);
+}
+
+.topbar__notifications-count {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.topbar__notifications-read-all {
+    border: 0.0625rem solid color-mix(in srgb, var(--accent) 36%, var(--border));
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+    color: var(--accent);
+    border-radius: 999rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.topbar__notifications-read-all:disabled {
+    opacity: 0.46;
+    cursor: not-allowed;
+}
+
+.topbar__notifications-empty {
+    padding: 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+}
+
+.topbar__notification {
+    padding: 0.62rem 0.72rem;
+    border-bottom: 0.0625rem solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    transition: background 0.15s ease;
+}
+
+.topbar__notification:last-child { border-bottom: none; }
+.topbar__notification--read { opacity: 0.72; }
+.topbar__notification:hover { background: var(--bg-hover); }
+
+.topbar__notification-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.topbar__notification-head strong {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.84rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.topbar__notification-time-inline {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.topbar__notification-dot {
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.topbar__notification-dot--info { background: var(--info); }
+.topbar__notification-dot--success { background: var(--success); }
+.topbar__notification-dot--warning { background: var(--warning); }
+.topbar__notification-dot--danger { background: var(--danger); }
+
+.topbar__notification-ack {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.topbar__notification-toggle {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 0.0625rem solid var(--border);
+    background: var(--bg-card);
+    border-radius: 999rem;
+    color: var(--text-muted);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.topbar__notification-toggle::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-right: 0.1rem solid currentColor;
+    border-bottom: 0.1rem solid currentColor;
+    transform: translate(-50%, -64%) rotate(45deg);
+}
+
+.topbar__notification--expanded .topbar__notification-toggle::before {
+    transform: translate(-50%, -36%) rotate(-135deg);
+}
+
+.topbar__notification-body {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+
+.topbar__notification--collapsed .topbar__notification-body { display: none; }
+
