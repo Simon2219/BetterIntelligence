@@ -2,7 +2,7 @@
  * Deploy namespace - Anonymous embed chat via /deploy/:slug
  */
 const deploymentChatService = require('../services/deploymentChatService');
-const realtimeBus = require('../services/realtimeBus');
+const notificationService = require('../services/notificationService');
 const log = require('../services/Logger')('deploy');
 
 function initDeploySocket(io) {
@@ -65,7 +65,7 @@ function initDeploySocket(io) {
             } catch (err) {
                 log.error('deploy:message error', { err: err.message });
                 socket.emit('agent:error', { error: err.message || 'Deployment message failed' });
-                realtimeBus.createNotification({
+                notificationService.createNotification({
                     userId: socket.agent?.user_id,
                     type: 'deploy_error',
                     title: `Deploy error: ${socket.agent?.name || slug}`,

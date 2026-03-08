@@ -1,4 +1,4 @@
-﻿const connection = require('./core/connection');
+const connection = require('./core/connection');
 const query = require('./core/query');
 const tx = require('./core/transaction');
 const ids = require('./core/ids');
@@ -12,8 +12,7 @@ const AIAgentRepository = require('./repositories/AIAgentRepository');
 const ChatRepository = require('./repositories/ChatRepository');
 const DeploymentRepository = require('./repositories/DeploymentRepository');
 const DeploymentMemberRepository = require('./repositories/DeploymentMemberRepository');
-const SkillCategoryRepository = require('./repositories/SkillCategoryRepository');
-const AgentCategoryRepository = require('./repositories/AgentCategoryRepository');
+const { AgentCategoryRepository, SkillCategoryRepository } = require('./repositories/CategoryRepositories');
 const UserPrivateTagRepository = require('./repositories/UserPrivateTagRepository');
 const HookConfigRepository = require('./repositories/HookConfigRepository');
 const SkillRepository = require('./repositories/SkillRepository');

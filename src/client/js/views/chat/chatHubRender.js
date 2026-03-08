@@ -115,6 +115,7 @@ export function createHubRenderer({
     showToast,
     escapeHtml,
     getAgentAvatarUrl,
+    createChatForAgent,
     sortByRecent,
     groupChatsByAgent,
     getPersonalChatTitle,
@@ -223,8 +224,7 @@ export function createHubRenderer({
                 setSidebarState,
                 clampSidebarWidth,
                 navigate,
-                api,
-                showToast
+                createChatForAgent
             });
 
             hydrateSidebarSummaries({

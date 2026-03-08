@@ -3,6 +3,12 @@ const router = express.Router();
 const multer = require('multer');
 const { authenticate } = require('../middleware/auth');
 const mediaService = require('../services/mediaService');
+const { safeErrorMessage } = require('../utils/httpErrors');
+
+const ALLOWED_MIME_TYPES = new Set([
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm'
+]);
 
 const maxSize = 25 * 1024 * 1024;
 const upload = multer({
@@ -26,7 +32,7 @@ router.post('/upload', authenticate, upload.single('file'), (req, res) => {
         });
         res.json({ success: true, data: { url: result.url, filename: result.filename } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -34,14 +40,18 @@ router.post('/capture', authenticate, (req, res) => {
     try {
         const { imageData, chatId, mimeType } = req.body;
         if (!imageData) return res.status(400).json({ success: false, error: 'No image data provided' });
+        const resolvedMime = mimeType || 'image/jpeg';
+        if (!ALLOWED_MIME_TYPES.has(resolvedMime)) {
+            return res.status(400).json({ success: false, error: 'Unsupported media type' });
+        }
         const result = mediaService.saveBase64(imageData, {
             userId: req.user.id,
             chatId: chatId || null,
-            mimeType: mimeType || 'image/jpeg'
+            mimeType: resolvedMime
         });
         res.json({ success: true, data: { url: result.url, filename: result.filename } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

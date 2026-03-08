@@ -1,4 +1,4 @@
-﻿const jwtService = require('../services/jwtService');
+const jwtService = require('../services/jwtService');
 const { UserRepository, RoleRepository } = require('../database');
 
 function extractToken(req) {
@@ -22,18 +22,6 @@ function authenticate(req, res, next) {
     next();
 }
 
-function optionalAuth(req, res, next) {
-    const token = extractToken(req);
-    if (token) {
-        const payload = jwtService.verifyAccessToken(token);
-        if (payload) {
-            const user = UserRepository.getWithRole(payload.userId);
-            if (user && user.is_active) req.user = user;
-        }
-    }
-    next();
-}
-
 function requirePermission(permission) {
     return (req, res, next) => {
         if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
@@ -48,6 +36,6 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ success: false, error: 'Admin required' });
 }
 
-module.exports = { authenticate, optionalAuth, requirePermission, requireAdmin };
+module.exports = { authenticate, requirePermission, requireAdmin };
 
 

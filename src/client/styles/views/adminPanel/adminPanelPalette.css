@@ -1,9 +1,9 @@
 /* Admin palette */
-@import url('./palette/theme-switch.css');
+@import url('./palette/themeSwitch.css');
 @import url('./palette/assignments.css');
-@import url('./palette/palette-list.css');
-@import url('./palette/color-editor.css');
-@import url('./palette/picker-popover.css');
+@import url('./palette/paletteList.css');
+@import url('./palette/colorEditor.css');
+@import url('./palette/pickerPopover.css');
 
 .admin-colors {
     display: grid;

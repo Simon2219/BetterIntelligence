@@ -1,5 +1,8 @@
-const ProviderRegistry = require('../ai/providers/ProviderRegistry');
-const AIExecution = require('../ai/execution/AIExecution');
+/**
+ * ContextSummaryService - AI-powered thread summary generation.
+ */
+const ProviderRegistry = require('../providers/ProviderRegistry');
+const AIExecution = require('../execution/AIExecution');
 const MAX_THREAD_SUMMARY_CHARS = 30;
 
 function mediaPlaceholders(message) {
@@ -78,4 +81,31 @@ async function generateThreadSummary({ agent, messages }) {
     return sanitizeSummary(result?.text || '');
 }
 
-module.exports = { generateThreadSummary, sanitizeSummary, MAX_THREAD_SUMMARY_CHARS };
+const MIN_MESSAGES_BETWEEN_SUMMARIES = 50;
+const SHORT_THREAD_DYNAMIC_LIMIT = 5;
+
+function shouldRegenerateSummary({ chat, currentMessageCount, force = false }) {
+    const existingSummary = String(chat?.thread_summary || '').trim();
+    const summaryMessageCount = parseInt(chat?.thread_summary_message_count, 10) || 0;
+
+    if (force) return true;
+    if (!existingSummary) return true;
+
+    const shortThreadNeedsRefresh = currentMessageCount > 0
+        && currentMessageCount <= SHORT_THREAD_DYNAMIC_LIMIT
+        && summaryMessageCount < currentMessageCount;
+    if (shortThreadNeedsRefresh) return true;
+
+    if ((currentMessageCount - summaryMessageCount) >= MIN_MESSAGES_BETWEEN_SUMMARIES) return true;
+
+    return false;
+}
+
+module.exports = {
+    generateThreadSummary,
+    sanitizeSummary,
+    shouldRegenerateSummary,
+    MAX_THREAD_SUMMARY_CHARS,
+    MIN_MESSAGES_BETWEEN_SUMMARIES,
+    SHORT_THREAD_DYNAMIC_LIMIT
+};

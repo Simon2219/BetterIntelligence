@@ -1,0 +1,47 @@
+/** Design System - Global custom properties and theme tokens */
+:root {
+    --bg-primary: #070f1f;
+    --bg-secondary: #0d1728;
+    --bg-card: #13213a;
+    --bg-hover: #1a2d4d;
+    --text-primary: #e8f0ff;
+    --text-secondary: #b7c6e6;
+    --text-muted: #7f94bf;
+    --accent: #3b82f6;
+    --accent-primary: #1d4ed8;
+    --accent-secondary: #0ea5e9;
+    --accent-hover: #60a5fa;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #38bdf8;
+    --border: #22385e;
+    --radius: 0.75rem;
+    --radius-sm: 0.5rem;
+    --radius-full: 624.9375rem;
+    --z-modal: 500;
+    --z-toast: 600;
+    --overlay-bg: rgba(4, 10, 22, 0.72);
+    --shadow-lg: 0 0.875rem 2.25rem rgba(2, 7, 18, 0.45);
+}
+
+[data-theme="light"] {
+    --bg-primary: #f3f8ff;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #e8f0ff;
+    --text-primary: #0d1b33;
+    --text-secondary: #2f4872;
+    --text-muted: #60779f;
+    --accent: #2563eb;
+    --accent-primary: #1d4ed8;
+    --accent-secondary: #0284c7;
+    --accent-hover: #3b82f6;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+    --info: #0ea5e9;
+    --border: #c7d8f3;
+    --overlay-bg: rgba(10, 24, 51, 0.24);
+    --shadow-lg: 0 0.625rem 1.875rem rgba(31, 76, 156, 0.14);
+}

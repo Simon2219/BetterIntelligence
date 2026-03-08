@@ -3,7 +3,36 @@ const { transaction } = require('../core/transaction');
 const { generateId } = require('../core/ids');
 
 
+const CHUNK_SIZE = 1500;
+
+function chunkContent(content) {
+    const words = content.split(/\s+/);
+    const chunks = [];
+    let current = [];
+    let currentLen = 0;
+    for (const word of words) {
+        current.push(word);
+        currentLen += word.length + 1;
+        if (currentLen >= CHUNK_SIZE) {
+            const text = current.join(' ');
+            chunks.push({ content: text, tokenCount: Math.ceil(text.length / 4) });
+            current = [];
+            currentLen = 0;
+        }
+    }
+    if (current.length) {
+        const text = current.join(' ');
+        chunks.push({ content: text, tokenCount: Math.ceil(text.length / 4) });
+    }
+    return chunks;
+}
+
 const KnowledgeRepository = {
+    addDocumentWithChunks(agentId, title, content, source = '') {
+        const chunks = chunkContent(content);
+        return this.addDocument(agentId, title, source, content, chunks);
+    },
+
     addDocument(agentId, title, source, content, chunks) {
         const id = generateId(10);
         const totalTokens = chunks.reduce((s, c) => s + c.tokenCount, 0);

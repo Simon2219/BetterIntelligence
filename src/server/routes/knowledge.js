@@ -1,7 +1,8 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const { AIAgentRepository, KnowledgeRepository } = require('../database');
 const { authenticate } = require('../middleware/auth');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 function checkAgentOwnership(req, res) {
     const agent = AIAgentRepository.getById(req.params.agentId);
@@ -18,7 +19,7 @@ router.get('/:agentId/documents', authenticate, (req, res) => {
         const docs = KnowledgeRepository.listDocuments(req.params.agentId);
         res.json({ success: true, data: docs });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -31,30 +32,10 @@ router.post('/:agentId/documents', authenticate, (req, res) => {
         const MAX_CONTENT_SIZE = 512000;
         if (typeof content !== 'string' || content.length > MAX_CONTENT_SIZE) return res.status(400).json({ success: false, error: `Content must be under ${MAX_CONTENT_SIZE / 1000}KB` });
 
-        const CHUNK_SIZE = 1500;
-        const words = content.split(/\s+/);
-        const chunks = [];
-        let current = [];
-        let currentLen = 0;
-        for (const word of words) {
-            current.push(word);
-            currentLen += word.length + 1;
-            if (currentLen >= CHUNK_SIZE) {
-                const text = current.join(' ');
-                chunks.push({ content: text, tokenCount: Math.ceil(text.length / 4) });
-                current = [];
-                currentLen = 0;
-            }
-        }
-        if (current.length) {
-            const text = current.join(' ');
-            chunks.push({ content: text, tokenCount: Math.ceil(text.length / 4) });
-        }
-
-        const doc = KnowledgeRepository.addDocument(req.params.agentId, title, source || '', content, chunks);
+        const doc = KnowledgeRepository.addDocumentWithChunks(req.params.agentId, title, content, source || '');
         res.status(201).json({ success: true, data: doc });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -64,7 +45,7 @@ router.get('/:agentId/documents/:docId/chunks', authenticate, (req, res) => {
         const chunks = KnowledgeRepository.getChunksForDocument(req.params.docId);
         res.json({ success: true, data: chunks.map(c => ({ id: c.id, index: c.chunk_index, preview: c.content.substring(0, 200), tokenCount: c.token_count })) });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -74,7 +55,7 @@ router.delete('/:agentId/documents/:docId', authenticate, (req, res) => {
         KnowledgeRepository.deleteDocument(req.params.docId);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

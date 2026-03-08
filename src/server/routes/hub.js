@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
@@ -6,6 +6,7 @@ const Config = require('../../../config/Config');
 const SkillLoader = require('../services/SkillLoader');
 const { SkillRepository, SkillRegistryRepository } = require('../database');
 const { authenticate } = require('../middleware/auth');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 router.get('/skills', (req, res) => {
     try {
@@ -18,7 +19,7 @@ router.get('/skills', (req, res) => {
         });
         res.json({ success: true, data: result });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -44,7 +45,7 @@ router.post('/publish', authenticate, (req, res) => {
         }
         res.json({ success: true, data: { ...skill, slug: safeSlug, id: skillId, source: 'hub' } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -82,7 +83,7 @@ router.post('/skills/:slug/install', authenticate, (req, res) => {
         SkillRepository.create({ id: skillId, slug, path: relPath, creatorId: null, visibility: 'private', name: loaded.name, description: loaded.description || '', version: loaded.version || '1.0.0' });
         res.json({ success: true, data: { ...loaded, id: skillId, slug, source: 'installed' } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

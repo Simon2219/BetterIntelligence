@@ -1,24 +1,19 @@
-﻿/**
+/**
  * Gateway-style Socket.io handler
  * Events: agent:invoke, agent:stream, agent:done, agent:media, agent:error
  */
 const Config = require('../../../config/Config');
 const { UserRepository, AIAgentRepository, ChatRepository, AnalyticsRepository, SubscriptionRepository } = require('../database');
 const HooksService = require('../services/HooksService');
-const ContextBuilder = require('../ai/context/ContextBuilder');
-const AIExecution = require('../ai/execution/AIExecution');
 const ProviderRegistry = require('../ai/providers/ProviderRegistry');
+const MainAIManager = require('../ai/MainAIManager');
 const { authenticateSocket } = require('./socketAuth');
 const socketSessionRegistry = require('../services/socketSessionRegistry');
-const realtimeBus = require('../services/realtimeBus');
+const notificationService = require('../services/notificationService');
+const analyticsService = require('../services/analyticsService');
 const Logger = require('../services/Logger');
+const { isSameUser } = require('../utils/helperFunctions');
 const log = Logger('socket');
-
-const IMAGE_TAG_REGEX = /\[IMAGE:\s*([^\]]+)\]/i;
-
-function isSameUser(left, right) {
-    return String(left || '').trim().toUpperCase() === String(right || '').trim().toUpperCase();
-}
 
 function resolveUserChatAccess(chatId, userId) {
     const chat = ChatRepository.getById(chatId);
@@ -57,21 +52,21 @@ async function runAIPipeline(io, socket, chat, userId, message, opts = {}) {
 
     try {
         AnalyticsRepository.record(agentId, 'invoke', { conversationId: chatId, userId, isNewConv: false });
-        realtimeBus.emitAnalyticsUpdate({
-            userId,
-            agentId,
+        analyticsService.emitAnalyticsUpdate({
+            userId, agentId,
             totalsDelta: { invokes: 1, messages: 1 },
-            point: { type: 'invoke', at: new Date().toISOString(), chatId }
+            point: { type: 'invoke', at: now, chatId }
         });
     } catch {}
     Logger.appendToConversationLog(chatId, `[${now}] [USER] ${message}`);
     Logger.appendToAgentLog(agentId, `[${now}] [INVOKE] conv=${chatId} user=${userId} msg=${message.substring(0, 120)}`);
     HooksService.fire('message_received', { agentId, conversationId: chatId, userId, message });
 
-    const aiEnabled = Config.get('ai.enabled', false) || process.env.AI_ENABLED === '1' || process.env.AI_ENABLED === 'true';
-    const textProvider = ProviderRegistry.getTextProvider(agent?.text_provider);
+    const usageContext = { source: 'chat', userId, agentId, chatId };
+    const invokeStart = Date.now();
+    const result = await MainAIManager.runAgentPipeline({ agent, user, chatId, message, usageContext });
 
-    if (!aiEnabled || !textProvider) {
+    if (result.status === 'ai_disabled' || result.status === 'no_provider') {
         const placeholder = '[AI not configured. Enable AI_ENABLED and ensure Ollama is running.]';
         const assistantMsg = { senderId: agentId, type: 'text', content: placeholder, timestamp: new Date().toISOString() };
         ChatRepository.addMessage(chatId, assistantMsg);
@@ -80,76 +75,23 @@ async function runAIPipeline(io, socket, chat, userId, message, opts = {}) {
         socket.emit('agent:done', { conversationId: chatId, response: placeholder });
         socket.emit('chat:typing', { agentId, conversationId: chatId, isTyping: false });
         HooksService.fire('agent_response', { agentId, conversationId: chatId, userId, response: placeholder });
-        realtimeBus.createNotification({
-            userId,
-            type: 'chat_warning',
-            title: agent?.name || 'Assistant',
+        notificationService.createNotification({
+            userId, type: 'chat_warning', title: agent?.name || 'Assistant',
             body: 'AI provider is not currently configured.',
-            severity: 'warning',
-            meta: { chatId, agentId }
+            severity: 'warning', meta: { chatId, agentId }
         });
         return;
     }
 
-    const invokeStart = Date.now();
-    log.info('runAIPipeline calling AI', { chatId, agentId, model: agent?.text_model });
-    const { systemPrompt, messages } = ContextBuilder.buildTextContext(agent, user, chatId, message);
-    const INVOKE_TIMEOUT = 90000;
-    let result;
-    try {
-        result = await Promise.race([
-            AIExecution.executeText({
-                agent,
-                systemPrompt,
-                messages,
-                usageContext: {
-                    source: 'chat',
-                    userId,
-                    agentId,
-                    chatId
-                }
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timed out after 90s')), INVOKE_TIMEOUT))
-        ]);
-    } catch (textErr) {
-        throw textErr;
+    if (result.media?.length) {
+        const mediaMsg = { senderId: agentId, type: 'media', content: '', media: result.media, timestamp: new Date().toISOString() };
+        ChatRepository.addMessage(chatId, { ...mediaMsg });
+        io.to(`chat:${chatId}`).emit('chat:message', { ...mediaMsg, chatId });
+        socket.emit('agent:media', { conversationId: chatId, media: result.media });
+        HooksService.fire('skill_invoked', { agentId, conversationId: chatId, userId, skillName: 'image_gen' });
     }
 
-    let displayText = result.text;
-    const imageMatch = result.text.match(IMAGE_TAG_REGEX);
-    const imageDescription = imageMatch?.[1]?.trim();
-
-    if (imageDescription && imageDescription.length >= 2) {
-        const hasImageProvider = agent.image_provider && ProviderRegistry.getImageProvider(agent.image_provider);
-        if (hasImageProvider) {
-            try {
-                const imagePrompt = ContextBuilder.buildImagePrompt(imageDescription, agent);
-                const imgResult = await AIExecution.executeImage({
-                    agent,
-                    conversationId: chatId,
-                    prompt: imagePrompt,
-                    usageContext: {
-                        source: 'chat-image',
-                        userId,
-                        agentId,
-                        chatId
-                    }
-                });
-                const mediaMsg = { senderId: agentId, type: 'media', content: '', media: imgResult.media, timestamp: new Date().toISOString() };
-                ChatRepository.addMessage(chatId, { ...mediaMsg, media: imgResult.media });
-                io.to(`chat:${chatId}`).emit('chat:message', { ...mediaMsg, chatId });
-                socket.emit('agent:media', { conversationId: chatId, media: imgResult.media });
-                HooksService.fire('skill_invoked', { agentId, conversationId: chatId, userId, skillName: 'image_gen' });
-            } catch (imgErr) {
-                log.error('Image generation failed', { err: imgErr.message });
-                displayText = (displayText || '') + "\n\n(I wanted to create an image but something went wrong. Try again later.)";
-            }
-        }
-    }
-
-    if (displayText) {
-        displayText = displayText.replace(IMAGE_TAG_REGEX, '').trim();
-    }
+    const displayText = result.text;
     if (displayText) {
         const assistantMsg = { senderId: agentId, type: 'text', content: displayText, timestamp: new Date().toISOString() };
         ChatRepository.addMessage(chatId, assistantMsg);
@@ -158,13 +100,9 @@ async function runAIPipeline(io, socket, chat, userId, message, opts = {}) {
         Logger.appendToAgentLog(agentId, `[${new Date().toISOString()}] [RESPONSE] conv=${chatId} len=${displayText.length}`);
         socket.emit('agent:stream', { conversationId: chatId, chunk: displayText, done: true });
         socket.emit('agent:done', { conversationId: chatId, response: displayText });
-        realtimeBus.createNotification({
-            userId,
-            type: 'chat_message',
-            title: agent?.name || 'Assistant',
-            body: displayText.slice(0, 160),
-            severity: 'info',
-            meta: { chatId, agentId }
+        notificationService.createNotification({
+            userId, type: 'chat_message', title: agent?.name || 'Assistant',
+            body: displayText.slice(0, 160), severity: 'info', meta: { chatId, agentId }
         });
     } else {
         socket.emit('agent:done', { conversationId: chatId, response: '' });
@@ -176,22 +114,14 @@ async function runAIPipeline(io, socket, chat, userId, message, opts = {}) {
         const promptTokens = result.aiMetadata?.promptTokens || 0;
         const completionTokens = result.aiMetadata?.completionTokens || 0;
         AnalyticsRepository.record(agentId, 'response', {
-            conversationId: chatId,
-            userId,
+            conversationId: chatId, userId,
             durationMs: Date.now() - invokeStart,
-            promptTokens,
-            completionTokens,
+            promptTokens, completionTokens,
             model: result.aiMetadata?.model
         });
-        realtimeBus.emitAnalyticsUpdate({
-            userId,
-            agentId,
-            totalsDelta: {
-                responses: 1,
-                promptTokens,
-                completionTokens,
-                totalTokens: promptTokens + completionTokens
-            },
+        analyticsService.emitAnalyticsUpdate({
+            userId, agentId,
+            totalsDelta: { responses: 1, promptTokens, completionTokens, totalTokens: promptTokens + completionTokens },
             point: { type: 'response', at: new Date().toISOString(), chatId }
         });
     } catch {}
@@ -307,7 +237,7 @@ function initGatewaySocket(io) {
                 log.error('chat:send AI pipeline error', { err: err.message, chatId });
                 socket.emit('chat:typing', { chatId, conversationId: chatId, isTyping: false });
                 socket.emit('agent:error', { error: err.message || 'Failed to process message', chatId, conversationId: chatId });
-                realtimeBus.createNotification({
+                notificationService.createNotification({
                     userId,
                     type: 'chat_error',
                     title: 'Chat error',
@@ -367,7 +297,7 @@ function initGatewaySocket(io) {
                 const errMsg = err.message || 'Unknown error';
                 if (chat?.id) Logger.appendToConversationLog(chat.id, `[${new Date().toISOString()}] [ERROR] ${errMsg}`);
                 socket.emit('agent:error', { error: errMsg, conversationId: chat?.id || data?.conversationId });
-                realtimeBus.createNotification({
+                notificationService.createNotification({
                     userId,
                     type: 'chat_error',
                     title: 'Agent invocation failed',
@@ -378,7 +308,7 @@ function initGatewaySocket(io) {
                 try {
                     if (agentId) {
                         AnalyticsRepository.record(agentId, 'error', { conversationId: chat?.id, error: errMsg.substring(0, 200) });
-                        realtimeBus.emitAnalyticsUpdate({
+                        analyticsService.emitAnalyticsUpdate({
                             userId,
                             agentId,
                             totalsDelta: { errors: 1 },

@@ -14,7 +14,7 @@ import { showConfirm } from '../components/Dialog.js';
 import { makeDropZone } from '../utils/dragdrop.js';
 import { showMediaUploadPreview } from '../components/MediaUploadPreview.js';
 import { showMediaViewer } from '../components/MediaViewer.js';
-import { icon } from '../utils/dom.js';
+import { icon, escapeHtml } from '../utils/dom.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -35,6 +35,7 @@ import { createSettingsView } from '../views/settings/settingsView.js';
 import { createOnboardingView } from '../views/onboarding/onboardingView.js';
 import { createMainAppView } from '../views/app/mainAppView.js';
 import { createAppNotificationsWindow } from '../views/app/appNotificationsWindow.js';
+import { renderLandingView } from '../views/app/appLandingView.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -64,22 +65,10 @@ import {
 } from './clientAppearance.js';
 import { createRouterController } from './router.js';
 
-// Temporary chat-domain glue hosted in app bootstrap for route lifecycle parity.
+// Chat-domain glue hosted in app bootstrap for route lifecycle parity.
 import { createChatSummaryOnCloseTrigger } from '../views/chat/chatLifecycle.js';
 import { clearChatSocketListeners } from '../views/chat/chatSocketEvents.js';
-
-/*
-|--------------------------------------------------------------------------
-| General Helpers
-|--------------------------------------------------------------------------
-*/
-
-// Escapes untrusted text before inserting into HTML strings.
-function escapeHtml(value) {
-    const node = document.createElement('div');
-    node.textContent = String(value ?? '');
-    return node.innerHTML;
-}
+import { createChatCreator } from '../views/chat/chatCreateService.js';
 
 /*
 |--------------------------------------------------------------------------
@@ -154,7 +143,14 @@ gatewaySocketController = createGatewaySocketController({
     navigate: navigateProxy,
     api,
     showToast,
-    resetNotificationsState: state.resetNotificationsState
+    resetNotificationsState: state.resetNotificationsState,
+    onUnreadCountChanged(count) {
+        const badge = document.getElementById('chat-unread-badge');
+        if (badge) {
+            badge.textContent = count > 99 ? '99+' : String(count);
+            badge.classList.toggle('sidebar__badge--hidden', count <= 0);
+        }
+    }
 });
 
 // Token-refresh hook rebinds socket auth whenever access token changes.
@@ -300,6 +296,13 @@ const { renderAgents, renderAgentForm } = createAgentsView({
     makeDropZone
 });
 
+// Chat creation service used by router and chat sidebar for new-chat flows.
+const createChatForAgent = createChatCreator({
+    api,
+    showToast,
+    navigate: navigateProxy
+});
+
 // Chat hub/thread rendering functions and message renderer.
 const { renderChatHub, renderChatView, renderChatMessage } = createChatView({
     api,
@@ -316,7 +319,8 @@ const { renderChatHub, renderChatView, renderChatMessage } = createChatView({
     icon,
     getToken,
     API_BASE,
-    getCurrentUser
+    getCurrentUser,
+    createChatForAgent
 });
 
 // Analytics view rendering function.
@@ -428,9 +432,9 @@ const routerController = createRouterController({
     triggerChatSummaryOnClose,
     clearChatSocketListeners,
     renderNav: renderMainAppView,
-    api,
-    showToast,
+    createChatForAgent,
     viewRenderers: {
+        renderLandingView,
         renderAuth,
         renderAgents,
         renderAgentForm,
@@ -477,43 +481,13 @@ export function bootstrapApp() {
         render(initialPath || '/');
     })();
 
-    window.BetterIntelligence = { navigate, getToken, api, showToast };
+    /**
+     * Public client API — exposed for browser console debugging.
+     * ONLY safe, non-authenticated utilities belong here.
+     * NEVER expose tokens, API clients, or user state on this object.
+     */
+    window.BetterIntelligence = Object.freeze({ navigate, showToast });
 }
-
-/*
-|--------------------------------------------------------------------------
-| Public Exports and Auto-Start
-|--------------------------------------------------------------------------
-*/
-
-// Re-export app composition surface used by tests and other modules.
-export {
-    navigate,
-    render,
-    renderMainAppView as renderNav,
-    renderAuth,
-    renderAgents,
-    renderAgentForm,
-    renderChatHub,
-    renderChatView,
-    renderAnalytics,
-    renderSkills,
-    renderSkillForm,
-    renderHub,
-    renderDeploy,
-    renderAdmin,
-    renderSettings,
-    renderOnboarding,
-    renderChatMessage,
-    getToken,
-    api,
-    createSocket,
-    ensureSocketClients as getSocketClients,
-    setCurrentUser,
-    getCurrentUser,
-    getCurrentView,
-    getActiveSocket
-};
 
 // Auto-start bootstrap when module is loaded via app entrypoint.
 bootstrapApp();

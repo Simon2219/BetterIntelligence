@@ -21,7 +21,9 @@ const migrationModules = [
     require('./m020_chat_summaries_and_model_registry'),
     require('./m021_ai_model_catalog_usage'),
     require('./m022_chat_summary_message_count'),
-    require('./m023_deployment_ownership_and_embed_acl')
+    require('./m023_deployment_ownership_and_embed_acl'),
+    require('./m024_refresh_token_families'),
+    require('./m025_drop_provider_api_key')
 ];
 
 function listMigrations() {

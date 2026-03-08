@@ -1,5 +1,7 @@
+/**
+ * NotificationService - Socket.io binding, in-memory notifications, and admin model event emitters.
+ */
 const { generateId } = require('../database');
-const log = require('./Logger')('realtime');
 
 let ioRef = null;
 const notificationsByUser = new Map();
@@ -23,6 +25,8 @@ function safeEmit(namespace, eventName, payload, room = null) {
         nsp.emit(eventName, payload);
     }
 }
+
+// --- Notifications ---
 
 function getUserNotifications(userId) {
     const key = String(userId || '').trim().toUpperCase();
@@ -108,6 +112,8 @@ function ackAllNotifications(userId) {
     return changed;
 }
 
+// --- Admin model status emitters ---
+
 function emitAdminModelStatusUpdate(payload) {
     if (!payload || typeof payload !== 'object') return;
     safeEmit('/admin', 'admin:model_status:update', payload, 'admin:model_status');
@@ -133,31 +139,10 @@ function emitAdminProviderStatusUpdate(payload) {
     safeEmit('/admin', 'admin:provider_status:update', payload, 'admin:model_status');
 }
 
-function emitAnalyticsSnapshot({ userId, agentId, snapshot }) {
-    const uid = String(userId || '').trim().toUpperCase();
-    const aid = String(agentId || '').trim().toUpperCase();
-    if (!uid || !aid) return;
-    safeEmit('/analytics', 'analytics:snapshot', {
-        agentId,
-        ...snapshot
-    }, `analytics:user:${uid}:agent:${aid}`);
-}
-
-function emitAnalyticsUpdate({ userId, agentId, totalsDelta, point }) {
-    const uid = String(userId || '').trim().toUpperCase();
-    const aid = String(agentId || '').trim().toUpperCase();
-    if (!uid || !aid) return;
-    safeEmit('/analytics', 'analytics:update', {
-        agentId,
-        totalsDelta: totalsDelta || {},
-        point: point || null,
-        generatedAt: new Date().toISOString()
-    }, `analytics:user:${uid}:agent:${aid}`);
-}
-
 module.exports = {
     bindIO,
     getIO,
+    safeEmit,
     createNotification,
     emitNotification,
     listNotifications,
@@ -167,7 +152,5 @@ module.exports = {
     emitNotificationBadge,
     emitAdminModelStatusUpdate,
     emitAdminModelUsageUpdate,
-    emitAdminProviderStatusUpdate,
-    emitAnalyticsSnapshot,
-    emitAnalyticsUpdate
+    emitAdminProviderStatusUpdate
 };

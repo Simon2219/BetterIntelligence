@@ -1,4 +1,4 @@
-﻿import { createChatStateController } from './chatState.js';
+import { createChatStateController } from './chatState.js';
 import { createChatFormatters } from './chatFormatters.js';
 import { createChatMessageRenderer } from './chatMessageRenderer.js';
 import { createChatHubDataController } from './chatHubData.js';
@@ -25,7 +25,8 @@ export function createChatView(deps) {
         icon,
         getToken,
         API_BASE,
-        getCurrentUser
+        getCurrentUser,
+        createChatForAgent
     } = deps;
 
     const stateController = createChatStateController({ getCurrentUser });
@@ -83,6 +84,7 @@ export function createChatView(deps) {
         showToast,
         escapeHtml,
         getAgentAvatarUrl,
+        createChatForAgent,
         sortByRecent: hubData.sortByRecent,
         groupChatsByAgent: hubData.groupChatsByAgent,
         getPersonalChatTitle: hubData.getPersonalChatTitle,

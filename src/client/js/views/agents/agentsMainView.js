@@ -5,7 +5,7 @@ import { bindAgentsListEvents } from './agentsListEvents.js';
 import { renderAgentsListView } from './agentsListRender.js';
 
 export function createAgentsView(deps) {
-    const { api, navigate, showToast, showConfirm, getAgentAvatarUrl, escapeHtml } = deps;
+    const { api, navigate, showToast, getAgentAvatarUrl, escapeHtml } = deps;
     const { renderAgentForm } = createAgentFormRenderer(deps);
 
     async function renderAgentsCategoryManager(container, categories) {
@@ -39,7 +39,7 @@ export function createAgentsView(deps) {
             api,
             navigate,
             showToast,
-            showConfirm,
+            showConfirm: deps.showConfirm,
             escapeHtml,
             renderAgents,
             renderAgentsCategoryManager

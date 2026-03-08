@@ -11,27 +11,14 @@ const {
 } = require('../database');
 const { authenticate } = require('../middleware/auth');
 const log = require('../services/Logger')('chat');
-const { generateThreadSummary, sanitizeSummary, MAX_THREAD_SUMMARY_CHARS } = require('../services/chatSummaryService');
+const { generateThreadSummary, sanitizeSummary, shouldRegenerateSummary, MAX_THREAD_SUMMARY_CHARS, MIN_MESSAGES_BETWEEN_SUMMARIES, SHORT_THREAD_DYNAMIC_LIMIT } = require('../ai/services/contextSummaryService');
 const deploymentAclService = require('../services/deploymentAclService');
 const deploymentChatService = require('../services/deploymentChatService');
-const { hydrateAgentModelAvailability, serializeAgentWithAvailability } = require('../services/agentAvailabilityService');
+const { hydrateAgentModelAvailability, serializeAgentWithAvailability } = require('../ai/services/agentAvailabilityService');
+const { safeErrorMessage } = require('../utils/httpErrors');
+const { isSameUser, parseBoolean } = require('../utils/helperFunctions');
 
 const { DEPLOYMENT_ACTIONS } = deploymentAclService;
-
-function isSameUser(left, right) {
-    return String(left || '').trim().toUpperCase() === String(right || '').trim().toUpperCase();
-}
-
-function parseBoolean(value) {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    if (typeof value === 'string') {
-        const normalized = value.trim().toLowerCase();
-        if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-        if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
-    }
-    return false;
-}
 
 function serializeAgent(agent) {
     if (!agent) return null;
@@ -117,7 +104,7 @@ router.get('/', authenticate, (req, res) => {
         res.json({ success: true, data: enriched });
     } catch (err) {
         log.error('List error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to list chats' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -163,7 +150,7 @@ router.get('/deployments', authenticate, (req, res) => {
         res.json({ success: true, data: chats });
     } catch (err) {
         log.error('Deployment chats list error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to list deployment chats' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -176,7 +163,7 @@ router.get('/unread-count', authenticate, (req, res) => {
         res.json({ success: true, data: { unreadCount } });
     } catch (err) {
         log.error('Unread count error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to get unread count' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -195,7 +182,7 @@ router.post('/', authenticate, (req, res) => {
         res.json({ success: true, data: chat });
     } catch (err) {
         log.error('Create error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to create chat' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -225,7 +212,7 @@ router.post('/:chatId/operator-reply', authenticate, async (req, res) => {
         res.json({ success: true, data: result });
     } catch (err) {
         const status = Number(err.statusCode || 500);
-        res.status(status).json({ success: false, error: err.message || 'Failed to process operator reply' });
+        res.status(status).json({ success: false, error: safeErrorMessage(err) || 'Failed to process operator reply' });
     }
 });
 
@@ -258,7 +245,7 @@ router.get('/:chatId', authenticate, (req, res) => {
         });
     } catch (err) {
         log.error('Get chat error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to get chat' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -288,7 +275,7 @@ router.get('/:chatId/messages', authenticate, (req, res) => {
         });
     } catch (err) {
         log.error('Get messages error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to get messages' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -308,7 +295,7 @@ router.put('/:chatId/read', authenticate, (req, res) => {
         res.json({ success: true });
     } catch (err) {
         log.error('Mark read error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to mark as read' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -323,22 +310,13 @@ router.post('/:chatId/summary', authenticate, async (req, res) => {
         const resolved = resolveChatAccess(chat, req.user.id);
         if (!resolved.canView) return res.status(403).json({ success: false, error: 'Access denied' });
 
-        const MIN_MESSAGES_BETWEEN_SUMMARIES = 50;
-        const SHORT_THREAD_DYNAMIC_LIMIT = 5;
         const forceRegenerate = req.body?.force === true;
         const agent = chat.ai_agent_id ? AIAgentRepository.getById(chat.ai_agent_id) : null;
         const currentMessageCount = ChatRepository.getMessageCount(chat.id);
         const existingSummary = String(chat.thread_summary || '').trim();
         const summaryMessageCount = parseInt(chat.thread_summary_message_count, 10) || 0;
-        const shortThreadNeedsRefresh = currentMessageCount > 0
-            && currentMessageCount <= SHORT_THREAD_DYNAMIC_LIMIT
-            && summaryMessageCount < currentMessageCount;
-        const shouldRegenerate = forceRegenerate
-            || !existingSummary
-            || shortThreadNeedsRefresh
-            || (currentMessageCount - summaryMessageCount) >= MIN_MESSAGES_BETWEEN_SUMMARIES;
 
-        if (!shouldRegenerate) {
+        if (!shouldRegenerateSummary({ chat, currentMessageCount, force: forceRegenerate })) {
             return res.json({
                 success: true,
                 data: {
@@ -397,7 +375,7 @@ router.post('/:chatId/summary', authenticate, async (req, res) => {
         });
     } catch (err) {
         log.error('Generate summary error', { err: err.message, chatId: req.params.chatId });
-        res.status(500).json({ success: false, error: 'Failed to generate summary' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -416,7 +394,7 @@ router.delete('/:chatId', authenticate, (req, res) => {
         res.json({ success: true });
     } catch (err) {
         log.error('Delete error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Failed to delete chat' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

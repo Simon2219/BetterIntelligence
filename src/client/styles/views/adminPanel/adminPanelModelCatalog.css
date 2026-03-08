@@ -1,8 +1,11 @@
 /* Admin model catalog */
-@import url('./modelCatalog/catalog-stats.css');
-@import url('./modelCatalog/provider-sections.css');
-@import url('./modelCatalog/modelRow.css');
-@import url('./modelCatalog/usageTiles.css');
+@import url('./modelCatalog/catalogStats.css');
+@import url('./modelCatalog/providerSections.css');
+@import url('./modelCatalog/modelRow/modelRowLayout.css');
+@import url('./modelCatalog/modelRow/modelRowUsage.css');
+@import url('./modelCatalog/modelRow/modelRowStatus.css');
+@import url('./modelCatalog/usageTiles/usageTilesBase.css');
+@import url('./modelCatalog/usageTiles/usageTilesAnimation.css');
 @import url('./modelCatalog/charts.css');
 @import url('./modelCatalog/controls.css');
 

@@ -1,4 +1,5 @@
 /* Embed view manifest */
+@import url('../../base/designSystem.css');
 @import url('../chat/chatTopBar.css');
 @import url('../chat/chatMessagePane.css');
 @import url('../chat/chatComposerBar.css');

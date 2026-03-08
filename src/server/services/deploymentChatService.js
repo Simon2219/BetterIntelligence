@@ -1,4 +1,3 @@
-const Config = require('../../../config/Config');
 const {
     generateId,
     DeploymentRepository,
@@ -6,22 +5,13 @@ const {
     ChatRepository,
     AnalyticsRepository
 } = require('../database');
-const ContextBuilder = require('../ai/context/ContextBuilder');
-const AIExecution = require('../ai/execution/AIExecution');
-const ProviderRegistry = require('../ai/providers/ProviderRegistry');
+const MainAIManager = require('../ai/MainAIManager');
 const HooksService = require('./HooksService');
-const realtimeBus = require('./realtimeBus');
-
-const IMAGE_TAG_REGEX = /\[IMAGE:\s*([^\]]+)\]/i;
-
-function createError(statusCode, message) {
-    const err = new Error(message);
-    err.statusCode = statusCode;
-    return err;
-}
+const notificationService = require('./notificationService');
+const { createHttpError } = require('../utils/httpErrors');
 
 function emitToEmbedRoom(slug, chatId, eventName, payload) {
-    const io = realtimeBus.getIO();
+    const io = notificationService.getIO();
     if (!io || !slug || !chatId) return;
     try {
         io.of(`/deploy/${slug}`).to(`deploy:chat:${chatId}`).emit(eventName, payload);
@@ -41,12 +31,12 @@ function loadDeploymentContextBySlug(slug, opts = {}) {
     const requireAgentActive = opts.requireAgentActive !== false;
 
     const dep = DeploymentRepository.getBySlug(slug);
-    if (!dep) throw createError(404, 'Deployment not found');
-    if (requireEmbedEnabled && !dep.embed_enabled) throw createError(403, 'Embed not enabled');
+    if (!dep) throw createHttpError(404, 'Deployment not found');
+    if (requireEmbedEnabled && !dep.embed_enabled) throw createHttpError(403, 'Embed not enabled');
 
     const agent = AIAgentRepository.getById(dep.agent_id);
     if (!agent || (requireAgentActive && !agent.is_active)) {
-        throw createError(404, 'Agent not found');
+        throw createHttpError(404, 'Agent not found');
     }
 
     return { dep, agent };
@@ -54,14 +44,14 @@ function loadDeploymentContextBySlug(slug, opts = {}) {
 
 function loadDeploymentContextByChatId(chatId) {
     const chat = ChatRepository.getById(chatId);
-    if (!chat) throw createError(404, 'Chat not found');
-    if (!chat.deployment_id) throw createError(400, 'Chat is not deployment-scoped');
+    if (!chat) throw createHttpError(404, 'Chat not found');
+    if (!chat.deployment_id) throw createHttpError(400, 'Chat is not deployment-scoped');
 
     const dep = DeploymentRepository.getById(chat.deployment_id);
-    if (!dep) throw createError(404, 'Deployment not found');
+    if (!dep) throw createHttpError(404, 'Deployment not found');
 
     const agent = AIAgentRepository.getById(dep.agent_id);
-    if (!agent) throw createError(404, 'Agent not found');
+    if (!agent) throw createHttpError(404, 'Agent not found');
 
     return { chat, dep, agent };
 }
@@ -94,15 +84,34 @@ function resolveOrCreateEmbedConversation({ slug, conversationId, embedSessionId
 async function runAIPipeline({ dep, agent, chat, prompt, usageSource, assistantMetadata = {}, emitToEmbed = true }) {
     const resultMessageIds = [];
     const safePrompt = String(prompt || '').trim();
+    const usageContext = { source: usageSource || 'embed', agentId: agent.id, chatId: chat.id };
+    const invokeStart = Date.now();
 
-    const aiEnabled = Config.get('ai.enabled', false) || process.env.AI_ENABLED === '1' || process.env.AI_ENABLED === 'true';
-    const textProvider = ProviderRegistry.getTextProvider(agent.text_provider);
-    if (!aiEnabled || !textProvider) {
+    let result;
+    try {
+        result = await MainAIManager.runAgentPipeline({
+            agent, user: null, chatId: chat.id, message: safePrompt, usageContext
+        });
+    } catch (err) {
+        const fallbackError = `[AI temporarily unavailable: ${err.message || 'model or service not ready'}]`;
+        const fallbackId = appendMessage(chat.id, {
+            senderId: agent.id, type: 'text', content: fallbackError,
+            timestamp: new Date().toISOString(),
+            metadata: { ...assistantMetadata, source: 'ai_error', error: true }
+        });
+        resultMessageIds.push(fallbackId);
+        if (emitToEmbed) {
+            emitToEmbedRoom(dep.slug, chat.id, 'agent:stream', { conversationId: chat.id, chunk: fallbackError, done: true });
+            emitToEmbedRoom(dep.slug, chat.id, 'agent:done', { conversationId: chat.id, response: fallbackError });
+        }
+        try { AnalyticsRepository.record(agent.id, 'error', { conversationId: chat.id, source: usageSource || 'embed', error: String(err.message || '').substring(0, 200) }); } catch {}
+        return { text: fallbackError, media: [], messageIds: resultMessageIds, status: 'error', error: err };
+    }
+
+    if (result.status === 'ai_disabled' || result.status === 'no_provider') {
         const fallback = '[AI not configured]';
         const fallbackId = appendMessage(chat.id, {
-            senderId: agent.id,
-            type: 'text',
-            content: fallback,
+            senderId: agent.id, type: 'text', content: fallback,
             timestamp: new Date().toISOString(),
             metadata: { ...assistantMetadata, source: assistantMetadata.source || 'ai_unavailable' }
         });
@@ -114,85 +123,22 @@ async function runAIPipeline({ dep, agent, chat, prompt, usageSource, assistantM
         return { text: fallback, media: [], messageIds: resultMessageIds, status: 'unavailable' };
     }
 
-    const invokeStart = Date.now();
-    let textResult;
-    try {
-        const { systemPrompt, messages } = ContextBuilder.buildTextContext(agent, null, chat.id, safePrompt);
-        textResult = await AIExecution.executeText({
-            agent,
-            systemPrompt,
-            messages,
-            usageContext: {
-                source: usageSource || 'embed',
-                agentId: agent.id,
-                chatId: chat.id
-            }
-        });
-    } catch (err) {
-        const fallbackError = `[AI temporarily unavailable: ${err.message || 'model or service not ready'}]`;
-        const fallbackId = appendMessage(chat.id, {
-            senderId: agent.id,
-            type: 'text',
-            content: fallbackError,
+    if (result.media?.length) {
+        const mediaId = appendMessage(chat.id, {
+            senderId: agent.id, type: 'media', content: '', media: result.media,
             timestamp: new Date().toISOString(),
-            metadata: { ...assistantMetadata, source: 'ai_error', error: true }
+            metadata: { ...assistantMetadata, source: 'ai_generated_media' }
         });
-        resultMessageIds.push(fallbackId);
+        resultMessageIds.push(mediaId);
         if (emitToEmbed) {
-            emitToEmbedRoom(dep.slug, chat.id, 'agent:stream', { conversationId: chat.id, chunk: fallbackError, done: true });
-            emitToEmbedRoom(dep.slug, chat.id, 'agent:done', { conversationId: chat.id, response: fallbackError });
-        }
-        try {
-            AnalyticsRepository.record(agent.id, 'error', {
-                conversationId: chat.id,
-                source: usageSource || 'embed',
-                error: String(err.message || '').substring(0, 200)
-            });
-        } catch {}
-        return { text: fallbackError, media: [], messageIds: resultMessageIds, status: 'error', error: err };
-    }
-
-    let displayText = String(textResult.text || '');
-    const media = [];
-    const imageMatch = displayText.match(IMAGE_TAG_REGEX);
-    const imageDescription = imageMatch?.[1]?.trim();
-    if (imageDescription && imageDescription.length >= 2 && agent.image_provider && ProviderRegistry.getImageProvider(agent.image_provider)) {
-        try {
-            const imagePrompt = ContextBuilder.buildImagePrompt(imageDescription, agent);
-            const imgResult = await AIExecution.executeImage({
-                agent,
-                conversationId: chat.id,
-                prompt: imagePrompt,
-                usageContext: {
-                    source: `${usageSource || 'embed'}-image`,
-                    agentId: agent.id,
-                    chatId: chat.id
-                }
-            });
-            const mediaId = appendMessage(chat.id, {
-                senderId: agent.id,
-                type: 'media',
-                content: '',
-                media: imgResult.media,
-                timestamp: new Date().toISOString(),
-                metadata: { ...assistantMetadata, source: 'ai_generated_media' }
-            });
-            resultMessageIds.push(mediaId);
-            media.push(...(imgResult.media || []));
-            if (emitToEmbed) {
-                emitToEmbedRoom(dep.slug, chat.id, 'agent:media', { conversationId: chat.id, media: imgResult.media });
-            }
-        } catch {
-            // Keep text response even if image generation fails.
+            emitToEmbedRoom(dep.slug, chat.id, 'agent:media', { conversationId: chat.id, media: result.media });
         }
     }
 
-    displayText = displayText.replace(IMAGE_TAG_REGEX, '').trim();
+    const displayText = result.text || '';
     if (displayText) {
         const textId = appendMessage(chat.id, {
-            senderId: agent.id,
-            type: 'text',
-            content: displayText,
+            senderId: agent.id, type: 'text', content: displayText,
             timestamp: new Date().toISOString(),
             metadata: { ...assistantMetadata, source: assistantMetadata.source || 'ai_generated' }
         });
@@ -207,27 +153,20 @@ async function runAIPipeline({ dep, agent, chat, prompt, usageSource, assistantM
 
     try {
         AnalyticsRepository.record(agent.id, 'response', {
-            conversationId: chat.id,
-            source: usageSource || 'embed',
+            conversationId: chat.id, source: usageSource || 'embed',
             durationMs: Date.now() - invokeStart,
-            promptTokens: textResult.aiMetadata?.promptTokens || 0,
-            completionTokens: textResult.aiMetadata?.completionTokens || 0
+            promptTokens: result.aiMetadata?.promptTokens || 0,
+            completionTokens: result.aiMetadata?.completionTokens || 0
         });
     } catch {}
 
-    return {
-        text: displayText,
-        media,
-        messageIds: resultMessageIds,
-        status: 'ok',
-        aiMetadata: textResult.aiMetadata
-    };
+    return { text: displayText, media: result.media || [], messageIds: resultMessageIds, status: 'ok', aiMetadata: result.aiMetadata };
 }
 
 async function handleEmbedUserMessage({ dep, agent, chat, embedSessionId, message, source = 'embed-rest', emitToEmbed = true }) {
     const safeMessage = String(message || '').trim();
-    if (!safeMessage) throw createError(400, 'message required');
-    if (safeMessage.length > 10000) throw createError(400, 'Message too long (max 10,000 characters)');
+    if (!safeMessage) throw createHttpError(400, 'message required');
+    if (safeMessage.length > 10000) throw createHttpError(400, 'Message too long (max 10,000 characters)');
 
     const userMessageId = appendMessage(chat.id, {
         senderId: `embed:${String(embedSessionId || chat.embed_session_id || chat.id)}`,
@@ -278,15 +217,15 @@ async function sendOperatorReply({ chatId, operatorUserId, mode, content, useLat
     const { chat, dep, agent } = loadDeploymentContextByChatId(chatId);
     const normalizedMode = String(mode || '').trim().toLowerCase();
     if (!['manual', 'generate'].includes(normalizedMode)) {
-        throw createError(400, 'mode must be "manual" or "generate"');
+        throw createHttpError(400, 'mode must be "manual" or "generate"');
     }
 
     const trimmedContent = String(content || '').trim();
     const messageIds = [];
 
     if (normalizedMode === 'manual') {
-        if (!trimmedContent) throw createError(400, 'content is required for manual mode');
-        if (trimmedContent.length > 10000) throw createError(400, 'content too long (max 10,000 characters)');
+        if (!trimmedContent) throw createHttpError(400, 'content is required for manual mode');
+        if (trimmedContent.length > 10000) throw createHttpError(400, 'content too long (max 10,000 characters)');
 
         const manualId = appendMessage(chat.id, {
             senderId: agent.id,
@@ -313,7 +252,7 @@ async function sendOperatorReply({ chatId, operatorUserId, mode, content, useLat
     if (!prompt && useLatestUserMessage) {
         prompt = String(ChatRepository.getLatestIncomingMessageForDeploymentChat(chat.id)?.content || '').trim();
     }
-    if (!prompt) throw createError(400, 'No prompt available to generate response');
+    if (!prompt) throw createHttpError(400, 'No prompt available to generate response');
 
     if (trimmedContent) {
         const operatorPromptId = appendMessage(chat.id, {

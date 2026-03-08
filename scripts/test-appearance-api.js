@@ -3,11 +3,15 @@
  * Run: node scripts/test-appearance-api.js
  */
 const https = require('https');
+const http = require('http');
 require('dotenv').config();
 const port = parseInt(process.env.PORT || '3000', 10);
+const useHttps = process.env.SSL_KEY_PATH || process.env.HTTPS === 'true';
+const client = useHttps ? https : http;
+const proto = useHttps ? 'https' : 'http';
 
-const req = https.get(
-  `https://localhost:${port}/api/appearance`,
+const req = client.get(
+  `${proto}://localhost:${port}/api/appearance`,
   { rejectUnauthorized: false },
   (res) => {
     let body = '';

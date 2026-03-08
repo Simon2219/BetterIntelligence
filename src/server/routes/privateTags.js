@@ -1,14 +1,15 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const { UserPrivateTagRepository } = require('../database');
 const { authenticate } = require('../middleware/auth');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 router.get('/', authenticate, (req, res) => {
     try {
         const tags = UserPrivateTagRepository.list(req.user.id);
         res.json({ success: true, data: tags });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -18,8 +19,8 @@ router.post('/', authenticate, (req, res) => {
         if (!name?.trim()) return res.status(400).json({ success: false, error: 'name required' });
         const tag = UserPrivateTagRepository.create(req.user.id, { name: name.trim(), color, style });
         res.status(201).json({ success: true, data: tag });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -31,8 +32,8 @@ router.put('/:id', authenticate, (req, res) => {
         }
         const updated = UserPrivateTagRepository.update(req.params.id, req.user.id, req.body);
         res.json({ success: true, data: updated });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -41,8 +42,8 @@ router.delete('/:id', authenticate, (req, res) => {
         const ok = UserPrivateTagRepository.delete(req.params.id, req.user.id);
         if (!ok) return res.status(404).json({ success: false, error: 'Tag not found' });
         res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

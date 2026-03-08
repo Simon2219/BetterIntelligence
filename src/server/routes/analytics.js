@@ -1,7 +1,8 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const { AIAgentRepository, AnalyticsRepository } = require('../database');
 const { authenticate } = require('../middleware/auth');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 router.get('/:agentId', authenticate, (req, res) => {
     try {
@@ -14,7 +15,7 @@ router.get('/:agentId', authenticate, (req, res) => {
         const stats = AnalyticsRepository.getStats(req.params.agentId, days);
         res.json({ success: true, data: stats });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

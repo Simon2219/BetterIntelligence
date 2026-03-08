@@ -14,13 +14,11 @@ const HooksService = require('../services/HooksService');
 const deploymentAclService = require('../services/deploymentAclService');
 const deploymentChatService = require('../services/deploymentChatService');
 const deploymentStatsService = require('../services/deploymentStatsService');
+const { safeErrorMessage } = require('../utils/httpErrors');
+const { isSameUser, parseBoolean } = require('../utils/helperFunctions');
 
 const HOOK_EVENTS = ['deploy_request', 'agent_response', 'message_received', 'skill_invoked'];
 const { DEPLOYMENT_ACTIONS } = deploymentAclService;
-
-function isSameUser(a, b) {
-    return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
-}
 
 function toManagerRole(rawRole) {
     return String(rawRole || '').trim().toLowerCase() === 'admin' ? 'admin' : 'manager';
@@ -54,17 +52,6 @@ function serializeMember(member) {
     };
 }
 
-function parseBooleanInput(value, fallback = null) {
-    if (value === undefined) return fallback;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value !== 0;
-    if (typeof value === 'string') {
-        const normalized = value.trim().toLowerCase();
-        if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-        if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
-    }
-    return fallback;
-}
 
 function serializeDeploymentForList(row, userId) {
     const access = deploymentAclService.resolveDeploymentAccess(row, userId);
@@ -142,7 +129,7 @@ router.get('/', authenticate, (req, res) => {
         const deployments = rows.map((row) => serializeDeploymentForList(row, req.user.id));
         res.json({ success: true, data: { deployments } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -168,7 +155,7 @@ router.post('/', authenticate, (req, res) => {
         const dep = DeploymentRepository.create(agentId, safeSlug, req.user.id);
         res.status(201).json({ success: true, data: dep });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -211,14 +198,14 @@ router.get('/:slug/manage', authenticate, loadDeployment, requireDeploymentActio
             }
         });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
 router.patch('/:slug/config', authenticate, loadDeployment, requireDeploymentAction(DEPLOYMENT_ACTIONS.MANAGE_CONFIG), (req, res) => {
     try {
         const updates = {};
-        const embedEnabled = parseBooleanInput(req.body?.embedEnabled, null);
+        const embedEnabled = parseBoolean(req.body?.embedEnabled, null);
         const webhookUrl = req.body?.webhookUrl;
         if (embedEnabled !== null) updates.embed_enabled = embedEnabled ? 1 : 0;
         if (webhookUrl !== undefined) updates.webhook_url = String(webhookUrl || '').trim();
@@ -237,7 +224,7 @@ router.patch('/:slug/config', authenticate, loadDeployment, requireDeploymentAct
             }
         });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -255,7 +242,7 @@ router.get('/:slug/stats', authenticate, loadDeployment, requireDeploymentAction
             }
         });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -264,7 +251,7 @@ router.get('/:slug/hooks', authenticate, loadDeployment, requireDeploymentAction
         const hooks = HookConfigRepository.listByDeployment(req.dep.id);
         res.json({ success: true, data: { hooks, access: serializeAccess(req.deploymentAccess) } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -278,7 +265,7 @@ router.post('/:slug/hooks', authenticate, loadDeployment, requireDeploymentActio
         HooksService.loadFromDb();
         res.status(201).json({ success: true, data: hook });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -292,7 +279,7 @@ router.delete('/:slug/hooks/:id', authenticate, loadDeployment, requireDeploymen
         HooksService.loadFromDb();
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -303,7 +290,7 @@ router.post('/:slug/api-key', authenticate, loadDeployment, requireDeploymentAct
         DeploymentRepository.update(req.params.slug, { api_key_hash: keyHash, api_enabled: 1 });
         res.json({ success: true, data: { apiKey, message: 'Save this key. It will not be shown again.' } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -319,7 +306,7 @@ router.get('/:slug/chats', authenticate, loadDeployment, requireDeploymentAction
             }
         });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -336,7 +323,7 @@ router.get('/:slug/chats/:chatId/messages', authenticate, loadDeployment, requir
         const messages = ChatRepository.getMessages(chat.id, limit, before);
         res.json({ success: true, data: { chatId: chat.id, messages } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -351,7 +338,7 @@ router.get('/:slug/members', authenticate, loadDeployment, requireDeploymentActi
             }
         });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -382,7 +369,7 @@ router.get('/:slug/member-search', authenticate, loadDeployment, requireDeployme
 
         res.json({ success: true, data: { users: results } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -409,7 +396,7 @@ router.post('/:slug/members', authenticate, loadDeployment, requireDeploymentAct
         const enriched = DeploymentMemberRepository.getByDeploymentAndUser(req.dep.id, userId);
         res.status(201).json({ success: true, data: serializeMember(enriched) });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -440,7 +427,7 @@ router.patch('/:slug/members/:userId', authenticate, loadDeployment, requireDepl
         const enriched = DeploymentMemberRepository.getByDeploymentAndUser(req.dep.id, targetUserId);
         res.json({ success: true, data: serializeMember(enriched) });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -455,7 +442,7 @@ router.delete('/:slug/members/:userId', authenticate, loadDeployment, requireDep
         if (!removed) return res.status(404).json({ success: false, error: 'Member not found' });
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -484,7 +471,7 @@ router.post('/:slug/chat', async (req, res) => {
         res.json({ success: true, data: result });
     } catch (err) {
         const status = Number(err.statusCode || 500);
-        res.status(status).json({ success: false, error: err.message });
+        res.status(status).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

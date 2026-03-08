@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
@@ -6,13 +6,14 @@ const Config = require('../../../config/Config');
 const SkillLoader = require('../services/SkillLoader');
 const { SkillRepository, SkillCategoryRepository, UserPrivateTagRepository } = require('../database');
 const { authenticate } = require('../middleware/auth');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 router.get('/categories', authenticate, (req, res) => {
     try {
         const categories = SkillCategoryRepository.list(req.user.id);
         res.json({ success: true, data: categories });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -23,7 +24,7 @@ router.post('/categories', authenticate, (req, res) => {
         const cat = SkillCategoryRepository.create(req.user.id, name.trim());
         res.status(201).json({ success: true, data: cat });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -37,7 +38,7 @@ router.put('/categories/reorder', authenticate, (req, res) => {
         SkillCategoryRepository.updateCategorySortOrder(valid.map((item, i) => ({ id: item.id, sort_order: i })));
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -50,7 +51,7 @@ router.put('/reorder', authenticate, (req, res) => {
         SkillCategoryRepository.reorderSkills(categoryId, skillIds);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -62,7 +63,7 @@ router.put('/categories/:id', authenticate, (req, res) => {
         if (name !== undefined) SkillCategoryRepository.update(req.params.id, { name: String(name).trim() });
         res.json({ success: true, data: SkillCategoryRepository.getById(req.params.id) });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -74,7 +75,7 @@ router.delete('/categories/:id', authenticate, (req, res) => {
         SkillCategoryRepository.delete(req.params.id);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -92,7 +93,7 @@ router.get('/', authenticate, (req, res) => {
         });
         res.json({ success: true, data: result });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -128,7 +129,7 @@ ${instructions || ''}
         const skill = SkillLoader.loadSkillFromDir(skillDir);
         res.status(201).json({ success: true, data: { ...skill, ...skillRow, source: 'workspace' } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -171,7 +172,7 @@ ${instructionsText}
         const loaded = SkillLoader.loadSkillFromDir(skillPath);
         res.json({ success: true, data: { ...skill, ...loaded, ...updates, source: 'workspace' } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -196,7 +197,7 @@ router.put('/:id/private-tags', authenticate, (req, res) => {
         toAssign.forEach(tid => UserPrivateTagRepository.assignToSkill(req.user.id, skillId, tid));
         res.json({ success: true, data: UserPrivateTagRepository.getSkillPrivateTags(req.user.id, skillId) });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -215,7 +216,7 @@ router.put('/:id/category', authenticate, (req, res) => {
         }
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

@@ -1,6 +1,6 @@
 const { authenticateSocket } = require('./socketAuth');
 const { AIAgentRepository, SubscriptionRepository, AnalyticsRepository } = require('../database');
-const realtimeBus = require('../services/realtimeBus');
+const analyticsService = require('../services/analyticsService');
 const socketSessionRegistry = require('../services/socketSessionRegistry');
 const log = require('../services/Logger')('analytics-socket');
 
@@ -50,7 +50,7 @@ function initAnalyticsSocket(io) {
                 socket.data.analyticsRooms.add(room);
 
                 const totals = AnalyticsRepository.getStats(agentId, windowDays);
-                realtimeBus.emitAnalyticsSnapshot({
+                analyticsService.emitAnalyticsSnapshot({
                     userId: socket.userId,
                     agentId,
                     snapshot: {

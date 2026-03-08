@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SkillLoader - Load skills from filesystem (bundled, workspace, installed)
  * Precedence: workspace > installed > bundled
  */
@@ -112,6 +112,44 @@ function getSkillsForContextBySkillIds(skillIds, agentId) {
     return blocks.length ? blocks.join('\n\n---\n\n') : '';
 }
 
-module.exports = { listSkillsForUser, getSkillPath, loadSkillFromDir, getSkillsForContext, getSkillsForContextBySkillIds, parseFrontmatter };
+function initFilesystem() {
+    const base = path.resolve(Config.get('skills.basePath', './data/skills'));
+    const dirs = [
+        path.join(base, 'bundled'),
+        path.join(base, 'workspace'),
+        path.join(base, 'installed')
+    ];
+    for (const d of dirs) {
+        if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    }
 
+    const bundledSkills = [
+        {
+            slug: 'greeting',
+            name: 'greeting',
+            description: 'Friendly greeting and small talk',
+            instructions: 'When the user greets you or wants casual conversation, respond warmly and encourage dialogue.'
+        },
+        {
+            slug: 'summarizer',
+            name: 'summarizer',
+            description: 'Summarize long text',
+            instructions: 'When the user asks you to summarize text, provide a concise summary that captures the main points.'
+        },
+        {
+            slug: 'qa',
+            name: 'qa',
+            description: 'Answer questions from context',
+            instructions: 'When the user asks a question, answer based on the context provided. Be concise and accurate.'
+        }
+    ];
 
+    for (const skill of bundledSkills) {
+        const skillPath = path.join(base, 'bundled', skill.slug);
+        if (fs.existsSync(skillPath)) continue;
+        fs.mkdirSync(skillPath, { recursive: true });
+        fs.writeFileSync(path.join(skillPath, 'SKILL.md'), `---\nname: ${skill.name}\ndescription: ${skill.description}\nversion: 1.0.0\n---\n\n${skill.instructions}\n`);
+    }
+}
+
+module.exports = { listSkillsForUser, getSkillPath, loadSkillFromDir, getSkillsForContext, getSkillsForContextBySkillIds, parseFrontmatter, initFilesystem };

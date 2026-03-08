@@ -83,7 +83,7 @@
     "passwordRequireNumber": true
   },
   "security": {
-    "acceptSocketQueryToken": true,
+    "acceptSocketQueryToken": false,
     "allowNoOriginInDev": true,
     "allowedOrigins": [
       "http://localhost:3000",
@@ -96,10 +96,24 @@
       "https://127.0.0.1:3001"
     ],
     "httpCorsOrigins": [
-      "*"
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+      "https://localhost:3000",
+      "https://localhost:3001",
+      "https://127.0.0.1:3000",
+      "https://127.0.0.1:3001"
     ],
     "socketCorsOrigins": [
-      "*"
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001",
+      "https://localhost:3000",
+      "https://localhost:3001",
+      "https://127.0.0.1:3000",
+      "https://127.0.0.1:3001"
     ]
   },
   "ai": {

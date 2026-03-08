@@ -54,9 +54,15 @@ export function buildAvatarSvg(initial, palette, shape) {
     return buildAgentAvatarSvg(initial, palette, shape);
 }
 
+const SAFE_URL_RE = /^(https?:\/\/|\/|data:image\/)/i;
+
+function isSafeAvatarUrl(url) {
+    return typeof url === 'string' && url.trim() && SAFE_URL_RE.test(url.trim());
+}
+
 export function getAgentAvatarUrl(agent, options = {}) {
     const url = agent?.avatar_url || agent?.avatarUrl;
-    if (url && typeof url === 'string' && url.trim()) return url;
+    if (isSafeAvatarUrl(url)) return url;
     const seed = hashString(agent?.id || agent?.name || 'agent');
     const palette = AGENT_AVATAR_PALETTES[seed % AGENT_AVATAR_PALETTES.length];
     const initial = getAgentAvatarInitial(agent);

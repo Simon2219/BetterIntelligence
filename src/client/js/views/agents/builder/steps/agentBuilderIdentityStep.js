@@ -9,7 +9,7 @@ export function renderIdentityStep(content, context) {
         showToast
     } = context;
 
-    const avatarSrc = formData.avatarUrl || getAgentAvatarUrl({ name: formData.name || 'A' }, { shape: 'circle' });
+    const avatarSrc = getAgentAvatarUrl({ avatar_url: formData.avatarUrl, name: formData.name || 'A' }, { shape: 'circle' });
     content.innerHTML = `
         <div class="builder-section">
             <h3 class="builder-section__title">Agent Identity</h3>
@@ -17,7 +17,7 @@ export function renderIdentityStep(content, context) {
         </div>
         <div class="agent-identity-layout">
             <div class="avatar-preview">
-                <img id="avatar-preview-img" src="${avatarSrc}" alt="Avatar" class="avatar-preview__img">
+                <img id="avatar-preview-img" src="${escapeHtml(avatarSrc)}" alt="Avatar" class="avatar-preview__img">
                 <button type="button" class="btn btn-ghost btn-sm" id="agent-avatar-edit">Edit Avatar</button>
                 <input type="file" id="agent-avatar-file" accept="image/jpeg,image/png,image/gif,image/webp" class="agent-avatar-file-input">
             </div>

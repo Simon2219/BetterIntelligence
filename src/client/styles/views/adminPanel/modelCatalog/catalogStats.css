@@ -1,7 +1,7 @@
 /* model-catalog stats */
 .admin-models__stats { display: grid; gap: 0.7rem; }
 .admin-models__stats--wide {
-    grid-template-columns: minmax(18rem, 34%) minmax(0, 1fr);
+    grid-template-columns: minmax(10rem, 20%) minmax(0, 1fr);
     align-items: stretch;
     gap: 0.68rem;
 }
@@ -38,11 +38,19 @@
     color: var(--text-muted);
     line-height: 1;
 }
+.admin-models__stats-group {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+}
+.admin-models__stats-group--compact {
+    grid-template-columns: 1fr;
+}
 .admin-models__stats-cluster--usage {
     gap: 0.18rem;
     padding-top: 0.24rem;
     padding-bottom: 0.3rem;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
 }
 .admin-models__stats-cluster--usage .admin-models__stats-cluster-head {
     margin: 0;
@@ -54,22 +62,35 @@
 }
 .admin-models__stats-cluster--usage .admin-models__stats-group--volume {
     margin-top: 0;
-    gap: 0.72rem;
+    gap: clamp(0.5rem, 1vw, 0.72rem);
     align-items: stretch;
-    align-self: end;
+    align-self: stretch;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
+    padding: clamp(0.4rem, 1.2vw, 0.85rem) clamp(0.35rem, 0.9vw, 0.7rem);
+}
+.admin-models__stats-cluster--usage .admin-model-stat--split {
+    align-self: stretch;
 }
 .admin-models__stats-cluster--usage .admin-model-stat__split-grid {
     min-height: clamp(4.6rem, 10vw, 9.4rem);
+    height: 100%;
 }
 .admin-models__stats-cluster--usage .admin-model-stat__split-cell {
     padding: clamp(0.64rem, 1.35vw, 1.32rem) clamp(0.18rem, 0.3vw, 0.36rem) clamp(0.5rem, 1.1vw, 1.08rem);
 }
 .admin-models__stats-cluster--usage .admin-model-stat__split-cell strong {
-    font-size: var(--ai-model-number-lg);
+    font-size: clamp(1.4rem, 2.6vw + 0.8rem, 4rem);
+}
+.admin-models__stats-cluster--usage .admin-model-stat[data-usage-tile*="prompt-tokens"] .admin-model-stat__split-cell strong,
+.admin-models__stats-cluster--usage .admin-model-stat[data-usage-tile*="completion-tokens"] .admin-model-stat__split-cell strong {
+    font-size: clamp(1.155rem, 1.68vw + 0.735rem, 2.94rem);
 }
 .admin-models__stats-cluster--usage .admin-model-stat__total-value {
-    font-size: clamp(1.28rem, 2.34vw + 0.7rem, 3.55rem);
+    font-size: clamp(1.5rem, 2.8vw + 0.8rem, 4.2rem);
+}
+.admin-models__stats-cluster--usage .admin-model-stat[data-usage-tile*="prompt-tokens"] .admin-model-stat__total-value,
+.admin-models__stats-cluster--usage .admin-model-stat[data-usage-tile*="completion-tokens"] .admin-model-stat__total-value {
+    font-size: clamp(1.208rem, 1.785vw + 0.756rem, 3.15rem);
 }
 .admin-models__usage-window.form-input--sm {
     padding: 0.34rem 0.74rem;

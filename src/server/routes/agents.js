@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { AIAgentRepository, SkillRepository, SubscriptionRepository, TagRepository, AgentCategoryRepository, UserPrivateTagRepository } = require('../database');
 const { authenticate } = require('../middleware/auth');
-const { hydrateAgentModelAvailability } = require('../services/agentAvailabilityService');
+const { hydrateAgentModelAvailability } = require('../ai/services/agentAvailabilityService');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 function attachSkillIds(agent) {
     if (!agent) return agent;
@@ -43,11 +44,29 @@ function attachAvailability(agent) {
     return hydrateAgentModelAvailability(agent, { clone: false });
 }
 
+function enrichAgent(agent, userId) {
+    if (!agent) return agent;
+    attachSkillIds(agent);
+    attachAvailability(agent);
+    attachCategoryIds(agent);
+    attachTags(agent);
+    attachPrivateTags(agent, userId);
+    attachSubscription(agent, userId);
+    return agent;
+}
+
+const SAFE_AVATAR_URL_RE = /^(https?:\/\/|\/media\/|\/|data:image\/)/i;
+
 function validateAgentData(data) {
     const errors = [];
     if (data.name !== undefined) {
         if (typeof data.name !== 'string' || data.name.trim().length < 1) errors.push('Name is required');
         if (data.name && data.name.length > 100) errors.push('Name must be under 100 characters');
+    }
+    if (data.avatarUrl !== undefined && data.avatarUrl) {
+        if (typeof data.avatarUrl !== 'string' || !SAFE_AVATAR_URL_RE.test(data.avatarUrl.trim())) {
+            errors.push('Avatar URL must use http, https, or a relative media path');
+        }
     }
     if (data.tagline !== undefined && data.tagline.length > 200) errors.push('Tagline must be under 200 characters');
     if (data.temperature !== undefined) {
@@ -81,8 +100,8 @@ router.get('/categories', authenticate, (req, res) => {
             agentCount: AgentCategoryRepository.getAgentCountByCategory(c.id)
         }));
         res.json({ success: true, data: withCount });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -92,8 +111,8 @@ router.post('/categories', authenticate, (req, res) => {
         if (!name?.trim()) return res.status(400).json({ success: false, error: 'name required' });
         const cat = AgentCategoryRepository.create(req.user.id, name.trim());
         res.status(201).json({ success: true, data: cat });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -106,8 +125,8 @@ router.put('/categories/reorder', authenticate, (req, res) => {
         const valid = order.filter(({ id }) => allowed.has(id));
         AgentCategoryRepository.updateCategorySortOrder(valid.map((item, i) => ({ id: item.id, sort_order: i })));
         res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -118,8 +137,8 @@ router.delete('/categories/:id', authenticate, (req, res) => {
         if (cat.user_id.toUpperCase() !== req.user.id.toUpperCase()) return res.status(403).json({ success: false, error: 'Forbidden' });
         AgentCategoryRepository.delete(req.params.id);
         res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -130,8 +149,8 @@ router.put('/categories/:id', authenticate, (req, res) => {
         const { name } = req.body;
         if (name !== undefined) AgentCategoryRepository.update(req.params.id, { name: String(name).trim() });
         res.json({ success: true, data: AgentCategoryRepository.getById(req.params.id) });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -143,8 +162,8 @@ router.put('/categories/:id/reorder', authenticate, (req, res) => {
         if (!Array.isArray(agentIds)) return res.status(400).json({ success: false, error: 'agentIds array required' });
         AgentCategoryRepository.reorderAgents(req.params.id, agentIds);
         res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -153,8 +172,8 @@ router.get('/tags', authenticate, (req, res) => {
         const q = (req.query.q || '').trim();
         const tags = q ? TagRepository.search(q, req.user.id, 20) : TagRepository.listForUser(req.user.id);
         res.json({ success: true, data: tags });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -166,13 +185,10 @@ router.get('/', authenticate, (req, res) => {
             .filter(id => !own.some(a => a.id === id))
             .map(id => AIAgentRepository.getById(id))
             .filter(Boolean);
-        const agents = [...own.map(a => ({ ...a, isOwner: true, isSubscribed: false })), ...subAgents.map(a => ({ ...a, isOwner: false, isSubscribed: true }))]
-            .map(attachSkillIds)
-            .map(attachAvailability)
-            .map(a => attachPrivateTags(attachTags(attachCategoryIds(a)), req.user.id));
+        const agents = [...own, ...subAgents].map(a => enrichAgent(a, req.user.id));
         res.json({ success: true, data: agents });
-    } catch {
-        res.status(500).json({ success: false, error: 'Failed to list agents' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -221,9 +237,9 @@ router.post('/', authenticate, (req, res) => {
             const tagIds = tagNames.map(n => TagRepository.getOrCreate(n, req.user.id)).filter(Boolean).map(t => t.id);
             TagRepository.setAgentTags(agent.id, tagIds);
         }
-        res.status(201).json({ success: true, data: attachPrivateTags(attachSkillIds(attachAvailability(attachTags(attachCategoryIds(agent)))), req.user.id) });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message || 'Failed to create agent' });
+        res.status(201).json({ success: true, data: enrichAgent(agent, req.user.id) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -232,11 +248,11 @@ router.get('/hub', authenticate, (req, res) => {
         const agents = AIAgentRepository.listHubPublished(100);
         const withMeta = agents.map(a => {
             const parsed = AIAgentRepository.getById ? AIAgentRepository.getById(a.id) : a;
-            return attachSubscription(attachPrivateTags(attachTags(attachCategoryIds(attachSkillIds(attachAvailability(parsed || a)))), req.user.id), req.user.id);
+            return enrichAgent(parsed || a, req.user.id);
         });
         res.json({ success: true, data: withMeta });
-    } catch {
-        res.status(500).json({ success: false, error: 'Failed to list hub agents' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -248,7 +264,7 @@ router.get('/:id', authenticate, (req, res) => {
     if (!isOwner && !isSub && a.hub_published !== 1) {
         return res.status(403).json({ success: false, error: 'Forbidden' });
     }
-    const out = attachSubscription(attachPrivateTags(attachTags(attachCategoryIds(attachSkillIds(attachAvailability(a)))), req.user.id), req.user.id);
+    const out = enrichAgent(a, req.user.id);
     if (!isOwner) {
         delete out.system_prompt;
         delete out.personality;
@@ -288,8 +304,8 @@ router.put('/:id/private-tags', authenticate, (req, res) => {
         current.forEach(tid => UserPrivateTagRepository.unassignFromAgent(req.user.id, req.params.id, tid));
         toAssign.forEach(tid => UserPrivateTagRepository.assignToAgent(req.user.id, req.params.id, tid));
         res.json({ success: true, data: UserPrivateTagRepository.getAgentPrivateTags(req.user.id, req.params.id) });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -303,16 +319,16 @@ router.put('/:id/category', authenticate, (req, res) => {
         if (!categoryId) {
             AgentCategoryRepository.getAgentCategoryIds(req.params.id).forEach(cid => AgentCategoryRepository.unassign(req.params.id, cid));
             const out = AIAgentRepository.getById(req.params.id);
-            return res.json({ success: true, data: attachSubscription(attachPrivateTags(attachTags(attachCategoryIds(attachSkillIds(attachAvailability(out || a)))), req.user.id), req.user.id) });
+            return res.json({ success: true, data: enrichAgent(out || a, req.user.id) });
         }
         const cat = cats.find(c => c.id === categoryId);
         if (!cat) return res.status(400).json({ success: false, error: 'Category not found' });
         AgentCategoryRepository.getAgentCategoryIds(req.params.id).forEach(cid => AgentCategoryRepository.unassign(req.params.id, cid));
         AgentCategoryRepository.assign(req.params.id, categoryId);
         const updated = AIAgentRepository.getById(req.params.id);
-        res.json({ success: true, data: attachSubscription(attachPrivateTags(attachTags(attachCategoryIds(attachSkillIds(attachAvailability(updated)))), req.user.id), req.user.id) });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        res.json({ success: true, data: enrichAgent(updated, req.user.id) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -332,9 +348,9 @@ router.put('/:id', authenticate, (req, res) => {
             const tagIds = tagNames.map(n => TagRepository.getOrCreate(n, req.user.id)).filter(Boolean).map(t => t.id);
             TagRepository.setAgentTags(req.params.id, tagIds);
         }
-        res.json({ success: true, data: attachSubscription(attachPrivateTags(attachTags(attachCategoryIds(attachSkillIds(attachAvailability(updated)))), req.user.id), req.user.id) });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message || 'Update failed' });
+        res.json({ success: true, data: enrichAgent(updated, req.user.id) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

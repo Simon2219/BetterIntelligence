@@ -29,7 +29,7 @@ export function renderReviewStep(content, context) {
         </div>
         <div class="review-card">
             <div class="review-card__header">
-                <img class="review-card__avatar" src="${formData.avatarUrl || getAgentAvatarUrl({ name: formData.name || 'A' }, { shape: 'circle' })}" alt="">
+                <img class="review-card__avatar" src="${escapeHtml(getAgentAvatarUrl({ avatar_url: formData.avatarUrl, name: formData.name || 'A' }, { shape: 'circle' }))}" alt="">
                 <div>
                     <div class="review-card__name">${escapeHtml(name)}</div>
                     <div class="review-card__tagline">${escapeHtml(formData.tagline || 'No tagline')}</div>

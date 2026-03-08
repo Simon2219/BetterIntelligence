@@ -1,15 +1,13 @@
-import { renderLandingView } from '../views/app/appLandingView.js';
-
 export function createRouterController({
     state,
     triggerChatSummaryOnClose,
     clearChatSocketListeners,
     renderNav,
-    api,
-    showToast,
+    createChatForAgent,
     viewRenderers
 } = {}) {
     const {
+        renderLandingView,
         renderAuth,
         renderAgents,
         renderAgentForm,
@@ -70,16 +68,7 @@ export function createRouterController({
                 return;
             }
             const agentId = path.split('/')[2];
-            try {
-                const { data } = await api('/chats', {
-                    method: 'POST',
-                    body: JSON.stringify({ agentId, forceNew: true })
-                });
-                navigate(`/chat/${data.id}`);
-            } catch (err) {
-                showToast(err.message || 'Failed to open chat', 'error');
-                navigate('/chat');
-            }
+            try { await createChatForAgent(agentId); } catch {}
             return;
         } else if (path === '/chat' || path.startsWith('/chat/') || path.startsWith('/chat?')) {
             if (!state.getCurrentUser()) {
@@ -96,31 +85,13 @@ export function createRouterController({
             }
             if (directNewMatch?.[1]) {
                 const routeAgentId = decodeURIComponent(directNewMatch[1]);
-                try {
-                    const { data } = await api('/chats', {
-                        method: 'POST',
-                        body: JSON.stringify({ agentId: routeAgentId, forceNew: true })
-                    });
-                    navigate(`/chat/${data.id}`, { replace: true });
-                } catch (err) {
-                    showToast(err.message || 'Failed to open chat', 'error');
-                    navigate('/chat', { replace: true });
-                }
+                try { await createChatForAgent(routeAgentId, { replace: true }); } catch {}
                 return;
             }
             const params = new URLSearchParams(path.includes('?') ? path.split('?')[1] : (location.search || ''));
             const agentParam = params.get('agent');
             if (agentParam) {
-                try {
-                    const { data } = await api('/chats', {
-                        method: 'POST',
-                        body: JSON.stringify({ agentId: agentParam, forceNew: true })
-                    });
-                    navigate(`/chat/${data.id}`, { replace: true });
-                } catch (err) {
-                    showToast(err.message || 'Failed to open chat', 'error');
-                    navigate('/chat');
-                }
+                try { await createChatForAgent(agentParam, { replace: true }); } catch {}
                 return;
             }
             const pathParts = pathname.split('/').filter(Boolean);
@@ -162,9 +133,7 @@ export function createRouterController({
                 return;
             }
             const role = state.getCurrentUser().role;
-            const canAdmin = role?.is_admin || role?.can_access_admin;
-            if (!canAdmin) {
-                showToast('Admin access required', 'error');
+            if (!(role?.is_admin || role?.can_access_admin)) {
                 navigate('/agents');
                 return;
             }

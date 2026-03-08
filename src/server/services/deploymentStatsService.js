@@ -1,4 +1,8 @@
-const { all, get } = require('../database');
+/**
+ * DeploymentStatsService - Orchestrates deployment statistics queries.
+ * All raw SQL is in DeploymentStatsRepository.
+ */
+const DeploymentStatsRepository = require('../database/repositories/DeploymentStatsRepository');
 
 function parseDays(value) {
     const parsed = parseInt(value, 10);
@@ -21,23 +25,10 @@ function percentileFromSorted(values, p) {
 function getDeploymentOperationalSummary(deploymentId) {
     const depId = parseInt(deploymentId, 10);
     if (!Number.isFinite(depId)) {
-        return {
-            chatCount: 0,
-            messageCount: 0,
-            lastMessageAt: null
-        };
+        return { chatCount: 0, messageCount: 0, lastMessageAt: null };
     }
 
-    const chatRow = get(`SELECT
-            COUNT(*) AS chat_count,
-            MAX(COALESCE(last_message_at, updated_at, created_at)) AS last_message_at
-        FROM chats
-        WHERE deployment_id = ?`, [depId]) || {};
-    const messageRow = get(`SELECT
-            COUNT(*) AS message_count
-        FROM chat_messages m
-        JOIN chats c ON UPPER(c.id) = UPPER(m.chat_id)
-        WHERE c.deployment_id = ?`, [depId]) || {};
+    const { chatRow, messageRow } = DeploymentStatsRepository.getOperationalCounts(depId);
 
     return {
         chatCount: toInt(chatRow.chat_count),
@@ -50,23 +41,11 @@ function getDeploymentStats(deploymentId, opts = {}) {
     const depId = parseInt(deploymentId, 10);
     if (!Number.isFinite(depId)) {
         return {
-            days: 30,
-            since: null,
+            days: 30, since: null,
             totals: {
-                chats: 0,
-                activeChats: 0,
-                messages: 0,
-                userMessages: 0,
-                assistantMessages: 0,
-                requests: 0,
-                errors: 0,
-                errorRate: 0,
-                promptTokens: 0,
-                completionTokens: 0,
-                totalTokens: 0,
-                avgLatencyMs: 0,
-                p50LatencyMs: 0,
-                p95LatencyMs: 0
+                chats: 0, activeChats: 0, messages: 0, userMessages: 0, assistantMessages: 0,
+                requests: 0, errors: 0, errorRate: 0, promptTokens: 0, completionTokens: 0,
+                totalTokens: 0, avgLatencyMs: 0, p50LatencyMs: 0, p95LatencyMs: 0
             },
             timeline: []
         };
@@ -75,70 +54,16 @@ function getDeploymentStats(deploymentId, opts = {}) {
     const days = parseDays(opts.days);
     const sinceIso = new Date(Date.now() - (days * 86400000)).toISOString();
 
-    const chatRow = get(`SELECT
-            COUNT(*) AS chat_count,
-            SUM(CASE WHEN COALESCE(last_message_at, created_at) >= ? THEN 1 ELSE 0 END) AS active_chat_count
-        FROM chats
-        WHERE deployment_id = ?`, [sinceIso, depId]) || {};
+    const chatRow = DeploymentStatsRepository.getChatCounts(depId, sinceIso);
+    const messageRow = DeploymentStatsRepository.getMessageCounts(depId);
+    const usageRow = DeploymentStatsRepository.getUsageTotals(depId, sinceIso);
+    const durationValues = DeploymentStatsRepository.getLatencyValues(depId, sinceIso)
+        .map((row) => toInt(row.ms))
+        .filter((value) => value > 0);
 
-    const messageRow = get(`SELECT
-            COUNT(*) AS total_messages,
-            SUM(CASE WHEN UPPER(m.sender_id) = UPPER(COALESCE(c.ai_agent_id, '')) THEN 1 ELSE 0 END) AS assistant_messages,
-            SUM(CASE WHEN UPPER(m.sender_id) != UPPER(COALESCE(c.ai_agent_id, '')) THEN 1 ELSE 0 END) AS user_messages
-        FROM chat_messages m
-        JOIN chats c ON UPPER(c.id) = UPPER(m.chat_id)
-        WHERE c.deployment_id = ?`, [depId]) || {};
-
-    const usageRow = get(`SELECT
-            COUNT(*) AS requests,
-            SUM(CASE WHEN e.success = 0 THEN 1 ELSE 0 END) AS errors,
-            SUM(e.prompt_tokens) AS prompt_tokens,
-            SUM(e.completion_tokens) AS completion_tokens,
-            SUM(e.total_tokens) AS total_tokens,
-            AVG(e.duration_ms) AS avg_latency_ms
-        FROM ai_model_usage_events e
-        JOIN chats c ON UPPER(c.id) = UPPER(e.chat_id)
-        WHERE c.deployment_id = ?
-          AND e.created_at >= ?`, [depId, sinceIso]) || {};
-
-    const durationValues = all(`SELECT e.duration_ms AS ms
-        FROM ai_model_usage_events e
-        JOIN chats c ON UPPER(c.id) = UPPER(e.chat_id)
-        WHERE c.deployment_id = ?
-          AND e.created_at >= ?
-          AND e.duration_ms IS NOT NULL
-        ORDER BY e.duration_ms ASC`, [depId, sinceIso]).map((row) => toInt(row.ms)).filter((value) => value > 0);
-
-    const messageTimelineRows = all(`SELECT
-            DATE(m.created_at) AS day,
-            COUNT(*) AS messages
-        FROM chat_messages m
-        JOIN chats c ON UPPER(c.id) = UPPER(m.chat_id)
-        WHERE c.deployment_id = ?
-          AND m.created_at >= ?
-        GROUP BY DATE(m.created_at)
-        ORDER BY day ASC`, [depId, sinceIso]);
-
-    const chatTimelineRows = all(`SELECT
-            DATE(c.created_at) AS day,
-            COUNT(*) AS chats
-        FROM chats c
-        WHERE c.deployment_id = ?
-          AND c.created_at >= ?
-        GROUP BY DATE(c.created_at)
-        ORDER BY day ASC`, [depId, sinceIso]);
-
-    const usageTimelineRows = all(`SELECT
-            DATE(e.created_at) AS day,
-            COUNT(*) AS requests,
-            SUM(CASE WHEN e.success = 0 THEN 1 ELSE 0 END) AS errors,
-            SUM(e.total_tokens) AS total_tokens
-        FROM ai_model_usage_events e
-        JOIN chats c ON UPPER(c.id) = UPPER(e.chat_id)
-        WHERE c.deployment_id = ?
-          AND e.created_at >= ?
-        GROUP BY DATE(e.created_at)
-        ORDER BY day ASC`, [depId, sinceIso]);
+    const messageTimelineRows = DeploymentStatsRepository.getMessageTimeline(depId, sinceIso);
+    const chatTimelineRows = DeploymentStatsRepository.getChatTimeline(depId, sinceIso);
+    const usageTimelineRows = DeploymentStatsRepository.getUsageTimeline(depId, sinceIso);
 
     const timelineMap = new Map();
     messageTimelineRows.forEach((row) => {
@@ -194,4 +119,3 @@ module.exports = {
     getDeploymentOperationalSummary,
     getDeploymentStats
 };
-

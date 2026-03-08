@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Admin Routes - Dashboard, settings, colors, config
  */
 const express = require('express');
@@ -7,12 +7,40 @@ const Config = require('../../../config/Config');
 const { UserRepository, RoleRepository, SettingsRepository } = require('../database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const appearanceService = require('../services/appearanceService');
-const aiModelCatalogService = require('../services/aiModelCatalogService');
+const aiModelCatalogService = require('../ai/services/aiModelCatalogService');
 const Logger = require('../services/Logger');
-const realtimeBus = require('../services/realtimeBus');
+const notificationService = require('../services/notificationService');
+const { safeErrorMessage } = require('../utils/httpErrors');
+
+const SETTINGS_ALLOWLIST = new Set([
+    'auth.accessTokenExpiryMinutes',
+    'auth.refreshTokenExpiryDays',
+    'auth.passwordMinLength',
+    'auth.passwordRequireUppercase',
+    'auth.passwordRequireNumber',
+    'ai.enabled',
+    'ai.ollamaUrl',
+    'ai.ollamaModel',
+    'ai.comfyuiUrl',
+    'ai.comfyuiModel',
+    'ai.comfyuiStartWithServer',
+    'ai.temperature',
+    'ai.maxTokens',
+    'ai.historyMessagesLimit',
+    'rateLimit.windowMs',
+    'rateLimit.maxRequests'
+]);
+
+function stripSecrets(config) {
+    if (config?.auth) {
+        delete config.auth.accessSecret;
+        delete config.auth.refreshSecret;
+    }
+    return config;
+}
 
 function notifyAdminAction(req, title, body, meta = {}) {
-    realtimeBus.createNotification({
+    notificationService.createNotification({
         userId: req?.user?.id,
         type: 'admin_action',
         title,
@@ -32,17 +60,17 @@ router.get('/dashboard', authenticate, requirePermission('can_access_admin'), (r
         };
         res.json({ success: true, data: stats });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
 router.get('/settings', authenticate, requirePermission('can_manage_settings'), (req, res) => {
     try {
         const settings = SettingsRepository.getAll();
-        const config = Config.getAll();
+        const config = stripSecrets(Config.getAll());
         res.json({ success: true, data: { settings, config } });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -52,6 +80,10 @@ router.put('/settings', authenticate, requirePermission('can_manage_settings'), 
         if (!settings || typeof settings !== 'object') {
             return res.status(400).json({ success: false, error: 'Settings object required' });
         }
+        const rejected = Object.keys(settings).filter(k => !SETTINGS_ALLOWLIST.has(k));
+        if (rejected.length) {
+            return res.status(400).json({ success: false, error: `Disallowed settings keys: ${rejected.join(', ')}` });
+        }
         for (const [key, val] of Object.entries(settings)) {
             const value = typeof val === 'object' ? JSON.stringify(val) : String(val);
             SettingsRepository.set(key, value, req.body.category || 'general');
@@ -60,7 +92,7 @@ router.put('/settings', authenticate, requirePermission('can_manage_settings'), 
         notifyAdminAction(req, 'Settings updated', 'Application settings were updated.', { category: req.body.category || 'general' });
         res.json({ success: true, message: 'Settings updated' });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -69,7 +101,7 @@ router.get('/colors', authenticate, requirePermission('can_manage_settings'), (r
         const data = appearanceService.getAdminColorsPayload();
         res.json({ success: true, data });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -83,7 +115,7 @@ router.put('/colors', authenticate, requirePermission('can_manage_settings'), (r
         notifyAdminAction(req, 'Theme colors updated', `Updated ${theme} theme colors.`, { theme });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -94,7 +126,7 @@ router.post('/palettes', authenticate, requirePermission('can_manage_settings'),
         notifyAdminAction(req, 'Palette created', `Created palette "${data?.palette?.name || name || 'untitled'}".`, { paletteId: data?.palette?.id || null });
         res.status(201).json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -105,7 +137,7 @@ router.put('/palettes/reorder', authenticate, requirePermission('can_manage_sett
         notifyAdminAction(req, 'Palettes reordered', 'Palette order was updated.');
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -116,7 +148,7 @@ router.put('/palettes/:id', authenticate, requirePermission('can_manage_settings
         notifyAdminAction(req, 'Palette updated', `Updated palette "${data?.palette?.name || req.params.id}".`, { paletteId: req.params.id });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -126,7 +158,7 @@ router.delete('/palettes/:id', authenticate, requirePermission('can_manage_setti
         notifyAdminAction(req, 'Palette deleted', `Deleted palette "${req.params.id}".`, { paletteId: req.params.id });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -137,7 +169,7 @@ router.put('/palette-assignments', authenticate, requirePermission('can_manage_s
         notifyAdminAction(req, 'Palette assignments updated', 'Updated dark/light theme assignments.', { darkPaletteId, lightPaletteId });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -147,7 +179,7 @@ router.get('/models', authenticate, requirePermission('can_manage_settings'), as
         const data = await aiModelCatalogService.getAdminCatalog({ days });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -159,7 +191,7 @@ router.post('/models/refresh', authenticate, requirePermission('can_manage_setti
         notifyAdminAction(req, 'Model catalog refreshed', 'Refreshed provider/model catalog from runtime providers.');
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -170,7 +202,7 @@ router.patch('/models/providers/:provider', authenticate, requirePermission('can
         notifyAdminAction(req, 'Provider updated', `Updated provider "${providerName}".`, { providerName });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -182,7 +214,7 @@ router.patch('/models/:provider/:modelId', authenticate, requirePermission('can_
         notifyAdminAction(req, 'Model updated', `Updated model "${providerName}/${modelId}".`, { providerName, modelId });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -195,20 +227,15 @@ router.get('/models/:provider/:modelId/usage', authenticate, requirePermission('
         const data = aiModelCatalogService.getModelUsage(providerName, modelId, { days, bucket });
         res.json({ success: true, data });
     } catch (err) {
-        res.status(err.statusCode || 500).json({ success: false, error: err.message });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
 router.get('/config', authenticate, requirePermission('can_access_admin'), (req, res) => {
     try {
-        const config = Config.getAll();
-        if (config.auth) {
-            if (config.auth.accessSecret) delete config.auth.accessSecret;
-            if (config.auth.refreshSecret) delete config.auth.refreshSecret;
-        }
-        res.json({ success: true, data: config });
+        res.json({ success: true, data: stripSecrets(Config.getAll()) });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -216,7 +243,7 @@ router.get('/logging', authenticate, requirePermission('can_manage_settings'), (
     try {
         res.json({ success: true, data: Logger.getStatus ? Logger.getStatus() : {} });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -230,7 +257,7 @@ router.post('/logging', authenticate, requirePermission('can_manage_settings'), 
         notifyAdminAction(req, 'Logging settings updated', 'Application logging settings were changed.');
         res.json({ success: true, data: Logger.getStatus ? Logger.getStatus() : {} });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

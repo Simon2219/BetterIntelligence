@@ -10,7 +10,8 @@ export function createGatewaySocketController({
     navigate,
     api,
     showToast,
-    resetNotificationsState
+    resetNotificationsState,
+    onUnreadCountChanged
 } = {}) {
     function handleUnauthorized() {
         setToken?.(null);
@@ -43,11 +44,7 @@ export function createGatewaySocketController({
         try {
             const { data } = await api('/chats/unread-count');
             const count = data?.unreadCount ?? 0;
-            const badge = document.getElementById('chat-unread-badge');
-            if (badge) {
-                badge.textContent = count > 99 ? '99+' : String(count);
-                badge.classList.toggle('sidebar__badge--hidden', count <= 0);
-            }
+            onUnreadCountChanged?.(count);
         } catch {}
     }
 

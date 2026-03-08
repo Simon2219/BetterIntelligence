@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 const Config = require('../../../config/Config');
@@ -7,6 +7,8 @@ const jwtService = require('../services/jwtService');
 const socketSessionRegistry = require('../services/socketSessionRegistry');
 const log = require('../services/Logger')('auth');
 const { authenticate } = require('../middleware/auth');
+const { sanitizeUser, validatePassword } = require('../utils/helperFunctions');
+const { safeErrorMessage } = require('../utils/httpErrors');
 
 function getRefreshCookieOptions(withMaxAge = true) {
     const opts = {
@@ -29,13 +31,6 @@ function clearRefreshCookie(res) {
     res.clearCookie('refresh_token', getRefreshCookieOptions(false));
 }
 
-function sanitizeUser(u) {
-    if (!u) return null;
-    const { password_hash, ...safe } = u;
-    try { safe.settings = JSON.parse(safe.settings || '{}'); } catch { safe.settings = {}; }
-    return safe;
-}
-
 router.post('/signup', async (req, res) => {
     try {
         const { email, password, username, displayName } = req.body;
@@ -48,11 +43,12 @@ router.post('/signup', async (req, res) => {
         if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
             return res.status(400).json({ success: false, error: 'Username: 3-30 alphanumeric/underscore' });
         }
-        const minLen = Config.get('auth.passwordMinLength', 8);
-        if (password.length < minLen) return res.status(400).json({ success: false, error: `Password min ${minLen} chars` });
+        const pwError = validatePassword(password);
+        if (pwError) return res.status(400).json({ success: false, error: pwError });
 
-        if (UserRepository.getByEmail(email)) return res.status(409).json({ success: false, error: 'Email taken' });
-        if (UserRepository.getByUsername(username)) return res.status(409).json({ success: false, error: 'Username taken' });
+        if (UserRepository.getByEmail(email) || UserRepository.getByUsername(username)) {
+            return res.status(409).json({ success: false, error: 'An account with this email or username already exists' });
+        }
 
         const hash = await bcrypt.hash(password, 12);
         const createdUser = UserRepository.create({
@@ -80,7 +76,7 @@ router.post('/signup', async (req, res) => {
         });
     } catch (err) {
         log.error('Signup error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Signup failed' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -104,7 +100,7 @@ router.post('/login', async (req, res) => {
         res.json({ success: true, data: { accessToken: tokens.accessToken, expiresIn: tokens.expiresIn, user: sanitizeUser(full) } });
     } catch (err) {
         log.error('Login error', { err: err.message });
-        res.status(500).json({ success: false, error: 'Login failed' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -127,7 +123,7 @@ router.post('/refresh', (req, res) => {
         const full = UserRepository.getWithRole(user.id);
         res.json({ success: true, data: { accessToken: tokens.accessToken, expiresIn: tokens.expiresIn, user: sanitizeUser(full) } });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Refresh failed' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -152,7 +148,7 @@ router.post('/logout-all', authenticate, (req, res) => {
         clearRefreshCookie(res);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Logout-all failed' });
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
@@ -162,6 +158,3 @@ router.get('/session', authenticate, (req, res) => {
 });
 
 module.exports = router;
-module.exports.sanitizeUser = sanitizeUser;
-
-

@@ -36,11 +36,12 @@ export function createChatMessageRenderer({
         mediaItems.forEach((med, idx) => {
             const url = resolveMediaUrl(med.url || med.mediaUrl);
             if (!url) return;
+            const safeUrl = escapeHtml(url);
             if (med.type === 'video') {
-                html += `<div class="chat-msg__media-thumb chat-msg__media-thumb--video" data-index="${idx}"><video src="${url}" muted></video></div>`;
+                html += `<div class="chat-msg__media-thumb chat-msg__media-thumb--video" data-index="${idx}"><video src="${safeUrl}" muted></video></div>`;
                 return;
             }
-            html += `<img src="${url}" alt="Media" class="chat-msg__media-thumb chat-msg__image" data-index="${idx}">`;
+            html += `<img src="${safeUrl}" alt="Media" class="chat-msg__media-thumb chat-msg__image" data-index="${idx}">`;
         });
 
         if (!html.trim() && !mediaItems.length) return '';

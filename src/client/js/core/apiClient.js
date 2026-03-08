@@ -37,7 +37,10 @@ export function createApiClient({
 
     async function api(path, opts = {}, isRetry = false) {
         const token = getToken();
-        const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+        const headers = { ...(opts.headers || {}) };
+        if (!(opts.body instanceof FormData)) {
+            headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+        }
         if (token) headers.Authorization = `Bearer ${token}`;
         const res = await fetch(`${apiBase}${path}`, { ...opts, headers, credentials: 'include' });
         const data = await res.json().catch(() => ({}));

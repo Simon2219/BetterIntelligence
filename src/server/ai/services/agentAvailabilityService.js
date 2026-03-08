@@ -1,4 +1,7 @@
-const { AIModelRepository } = require('../database');
+/**
+ * AgentAvailabilityService - Hydrates agent model availability statuses.
+ */
+const { AIModelRepository } = require('../../database');
 
 function normalizeProviderName(value) {
     return String(value || '').trim().toLowerCase();
@@ -156,11 +159,6 @@ function hydrateAgentModelAvailability(agent, opts = {}) {
     return target;
 }
 
-function hydrateAgentsModelAvailability(agents, opts = {}) {
-    if (!Array.isArray(agents)) return [];
-    return agents.map((agent) => hydrateAgentModelAvailability(agent, opts));
-}
-
 function serializeAgentWithAvailability(agent) {
     if (!agent) return null;
     return {
@@ -193,6 +191,5 @@ function serializeAgentWithAvailability(agent) {
 
 module.exports = {
     hydrateAgentModelAvailability,
-    hydrateAgentsModelAvailability,
     serializeAgentWithAvailability
 };

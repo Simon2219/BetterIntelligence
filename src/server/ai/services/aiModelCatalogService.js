@@ -1,6 +1,9 @@
-﻿const ProviderRegistry = require('../ai/providers/ProviderRegistry');
-const { AIModelRepository } = require('../database');
-const realtimeBus = require('./realtimeBus');
+/**
+ * AIModelCatalogService - Manages the AI model catalog and provider discovery.
+ */
+const ProviderRegistry = require('../providers/ProviderRegistry');
+const { AIModelRepository } = require('../../database');
+const notificationService = require('../../services/notificationService');
 
 const PROVIDER_REFRESH_CACHE_MS = 12000;
 let providerRefreshCache = { at: 0, providers: null };
@@ -73,7 +76,7 @@ async function refreshCatalog(opts = {}) {
             metadata: baseMetadata
         });
 
-        realtimeBus.emitAdminProviderStatusUpdate({
+        notificationService.emitAdminProviderStatusUpdate({
             providerName: provider.name,
             available: !!provider.available,
             error: provider.error || null,
@@ -81,7 +84,7 @@ async function refreshCatalog(opts = {}) {
         });
 
         syncedModels.forEach((model) => {
-            realtimeBus.emitAdminModelStatusUpdate({
+            notificationService.emitAdminModelStatusUpdate({
                 providerName: provider.name,
                 modelId: model.id,
                 isActive: !!model.isActive,
@@ -97,7 +100,7 @@ async function refreshCatalog(opts = {}) {
                 metadata: { ...baseMetadata, isDefault: true }
             });
             if (row) {
-                realtimeBus.emitAdminModelStatusUpdate({
+                notificationService.emitAdminModelStatusUpdate({
                     providerName: row.provider_name,
                     modelId: row.model_id,
                     isActive: (row.is_active ?? 1) === 1,
@@ -277,7 +280,7 @@ function updateModelConfig(providerName, modelId, payload = {}) {
         throw err;
     }
     const mapped = mapModelRow(updated);
-    realtimeBus.emitAdminModelStatusUpdate({
+    notificationService.emitAdminModelStatusUpdate({
         providerName: mapped.providerName,
         modelId: mapped.modelId,
         isActive: !!mapped.isActive,
@@ -303,7 +306,7 @@ function updateProviderConfig(providerName, payload = {}) {
 
     const displayName = AIModelRepository.setProviderDisplayName(normalizedProviderName, payload.displayName);
     providerRefreshCache = { at: 0, providers: null };
-    realtimeBus.emitAdminProviderStatusUpdate({
+    notificationService.emitAdminProviderStatusUpdate({
         providerName: normalizedProviderName,
         available: true,
         error: null,
@@ -342,4 +345,3 @@ module.exports = {
     getModelUsage,
     recordModelUsage
 };
-

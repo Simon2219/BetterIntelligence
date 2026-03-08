@@ -5,6 +5,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -51,6 +52,48 @@ function loadClientCssSurface() {
   return files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 }
 
+function loadServerSurface() {
+  const serverRoot = path.join(root, 'src/server');
+  const stack = [serverRoot];
+  const files = [];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.isFile() && full.endsWith('.js')) files.push(full);
+    }
+  }
+  files.push(path.join(root, 'server.js'));
+  files.sort();
+  return files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+}
+
+function httpRequest(method, urlPath, body, token) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'localhost',
+      port,
+      path: urlPath,
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      rejectUnauthorized: false
+    };
+    if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+    const r = client.request(opts, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    r.on('error', reject);
+    if (body) r.write(JSON.stringify(body));
+    r.end();
+  });
+}
+
 // 1-1: Light theme CSS
 try {
   const css = loadClientCssSurface();
@@ -63,8 +106,11 @@ try {
 }
 
 // 1-2: Config / API
-const req = https.get(
-  `https://localhost:${port}/api/appearance`,
+const useHttps = process.env.SSL_KEY_PATH || process.env.HTTPS === 'true';
+const client = useHttps ? https : http;
+const proto = useHttps ? 'https' : 'http';
+const req = client.get(
+  `${proto}://localhost:${port}/api/appearance`,
   { rejectUnauthorized: false },
   (res) => {
     let body = '';
@@ -129,7 +175,7 @@ function runRemaining() {
   else fail('4-4', 'Avatar');
   if (appJs.includes('builder-tooltip')) pass('4-5', 'Tooltips');
   else fail('4-5', 'No tooltips');
-  if (appJs.includes('_tutorialComplete') && appJs.includes('disabled')) pass('4-6', 'Steps locked');
+  if (appJs.includes('tutorialComplete') && appJs.includes('disabled')) pass('4-6', 'Steps locked');
   else fail('4-6', 'Tutorial lock');
   if (appJs.includes('agentBuilderTutorialComplete')) pass('4-7', 'Tutorial complete flag');
   else fail('4-7', 'Tutorial flag missing');
@@ -200,7 +246,157 @@ function runRemaining() {
   if (media.includes('conversationId') && media.includes('/media/')) pass('8-3', 'mediaService path');
   else fail('8-3', 'mediaService');
 
-  // Output
+  // 9-x: Server Rework - Structure & Imports
+  const serverSrc = loadServerSurface();
+
+  if (!/require\([^)]*realtimeBus/.test(serverSrc)) pass('9-1', 'No realtimeBus imports in server');
+  else fail('9-1', 'Found realtimeBus require in server code');
+
+  if (!/require\([^)]*\/chatSummaryService/.test(serverSrc)) pass('9-2', 'No old chatSummaryService imports');
+  else fail('9-2', 'Found chatSummaryService require (should be contextSummaryService)');
+
+  const routeDir = path.join(root, 'src/server/routes');
+  const criticalRoutes = ['agents.js', 'auth.js', 'chats.js', 'deploy.js', 'users.js', 'skills.js', 'admin.js', 'knowledge.js'];
+  const missingSafeErr = criticalRoutes.filter((r) => {
+    const p = path.join(routeDir, r);
+    return fs.existsSync(p) && !fs.readFileSync(p, 'utf8').includes('safeErrorMessage');
+  });
+  if (missingSafeErr.length === 0) pass('9-3', 'All critical routes use safeErrorMessage');
+  else fail('9-3', `Missing safeErrorMessage in: ${missingSafeErr.join(', ')}`);
+
+  const hasNotif = fs.existsSync(path.join(root, 'src/server/services/notificationService.js'));
+  const hasAnalyticsSvc = fs.existsSync(path.join(root, 'src/server/services/analyticsService.js'));
+  if (hasNotif && hasAnalyticsSvc) pass('9-4', 'notificationService + analyticsService exist');
+  else fail('9-4', 'Missing notification/analytics service');
+
+  const aimPath = path.join(root, 'src/server/ai/MainAIManager.js');
+  if (fs.existsSync(aimPath)) {
+    const aim = fs.readFileSync(aimPath, 'utf8');
+    if (aim.includes('runAgentPipeline') && aim.includes('generateTextResponse') && aim.includes('generateImageFromTag'))
+      pass('9-5', 'MainAIManager has expected exports');
+    else fail('9-5', 'MainAIManager missing expected functions');
+  } else {
+    fail('9-5', 'MainAIManager.js missing');
+  }
+
+  const catRepoPath = path.join(root, 'src/server/database/repositories/CategoryRepositories.js');
+  if (fs.existsSync(catRepoPath)) {
+    const catRepo = fs.readFileSync(catRepoPath, 'utf8');
+    if (catRepo.includes('AgentCategoryRepository') && catRepo.includes('SkillCategoryRepository'))
+      pass('9-6', 'CategoryRepositories combines agent + skill');
+    else fail('9-6', 'CategoryRepositories incomplete');
+  } else {
+    fail('9-6', 'CategoryRepositories.js missing');
+  }
+
+  const ctxPath = path.join(root, 'src/server/ai/services/contextSummaryService.js');
+  if (fs.existsSync(ctxPath)) {
+    const ctxSrc = fs.readFileSync(ctxPath, 'utf8');
+    if (ctxSrc.includes('shouldRegenerateSummary') && ctxSrc.includes('generateThreadSummary'))
+      pass('9-7', 'contextSummaryService has expected exports');
+    else fail('9-7', 'contextSummaryService missing functions');
+  } else {
+    fail('9-7', 'contextSummaryService.js missing');
+  }
+
+  // 9-8 to 9-10: Module require + unit validation
+  try {
+    const helpers = require('../src/server/utils/helperFunctions');
+    const expected = ['isSameUser', 'parseBoolean', 'sanitizeUser', 'validatePassword', 'isAgentOwner', 'normalizeOrigin', 'buildOriginMatcher'];
+    const missing = expected.filter((fn) => typeof helpers[fn] !== 'function');
+    if (missing.length === 0) pass('9-8', 'helperFunctions exports all 7 functions');
+    else fail('9-8', `Missing: ${missing.join(', ')}`);
+
+    const nullResult = helpers.validatePassword(null);
+    if (nullResult && typeof nullResult === 'string') pass('9-9', 'validatePassword guards null input');
+    else fail('9-9', 'validatePassword did not return error for null');
+  } catch (e) {
+    fail('9-8', `helperFunctions require failed: ${e.message}`);
+    fail('9-9', 'Skipped (module load failed)');
+  }
+
+  try {
+    const errors = require('../src/server/utils/httpErrors');
+    const expected = ['safeErrorMessage', 'AppError', 'createHttpError', 'badRequest', 'notFound', 'forbidden', 'unauthorized', 'conflict', 'isAppError', 'handleRouteError'];
+    const missing = expected.filter((fn) => typeof errors[fn] !== 'function');
+    if (missing.length === 0) pass('9-10', 'httpErrors exports all 10 functions');
+    else fail('9-10', `Missing: ${missing.join(', ')}`);
+  } catch (e) {
+    fail('9-10', `httpErrors require failed: ${e.message}`);
+  }
+
+  // 10-x: API Endpoint Tests (async)
+  runApiTests().then(printResults);
+}
+
+async function runApiTests() {
+  try {
+    const r = await httpRequest('GET', '/api/agents');
+    if (r.status === 401) pass('10-1', 'GET /api/agents requires auth');
+    else fail('10-1', `Expected 401, got ${r.status}`);
+  } catch (e) {
+    fail('10-1', e.message);
+  }
+
+  try {
+    const r = await httpRequest('GET', '/api/chats');
+    if (r.status === 401) pass('10-2', 'GET /api/chats requires auth');
+    else fail('10-2', `Expected 401, got ${r.status}`);
+  } catch (e) {
+    fail('10-2', e.message);
+  }
+
+  let token = null;
+  try {
+    const creds = { email: 'rework-verify@test.local', username: 'rework_verify', password: 'TestPass123', displayName: 'Rework Verify' };
+    let r = await httpRequest('POST', '/api/auth/signup', creds);
+    if (r.status === 201 && r.body?.data?.accessToken) {
+      token = r.body.data.accessToken;
+    } else {
+      r = await httpRequest('POST', '/api/auth/login', { login: creds.email, password: creds.password });
+      if (r.body?.data?.accessToken) token = r.body.data.accessToken;
+    }
+    if (token) pass('10-3', 'Auth signup/login flow returns token');
+    else fail('10-3', `No token received (signup: ${r.status})`);
+  } catch (e) {
+    fail('10-3', e.message);
+  }
+
+  if (token) {
+    try {
+      const r = await httpRequest('GET', '/api/agents', null, token);
+      if (r.status === 200 && r.body?.success === true && Array.isArray(r.body?.data))
+        pass('10-4', 'GET /api/agents returns { success, data[] }');
+      else fail('10-4', `Unexpected: ${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
+    } catch (e) {
+      fail('10-4', e.message);
+    }
+
+    try {
+      const r = await httpRequest('GET', '/api/chats', null, token);
+      if (r.status === 200 && r.body?.success === true && Array.isArray(r.body?.data))
+        pass('10-5', 'GET /api/chats returns { success, data[] }');
+      else fail('10-5', `Unexpected: ${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
+    } catch (e) {
+      fail('10-5', e.message);
+    }
+
+    try {
+      const r = await httpRequest('GET', '/api/agents/nonexistent-id-00000', null, token);
+      if (r.body?.success === false && typeof r.body?.error === 'string')
+        pass('10-6', 'Error responses use { success: false, error }');
+      else fail('10-6', `Unexpected format: ${JSON.stringify(r.body).slice(0, 120)}`);
+    } catch (e) {
+      fail('10-6', e.message);
+    }
+  } else {
+    fail('10-4', 'Skipped (no auth token)');
+    fail('10-5', 'Skipped (no auth token)');
+    fail('10-6', 'Skipped (no auth token)');
+  }
+}
+
+function printResults() {
   const passed = results.filter((r) => r.status === 'PASS').length;
   const failed = results.filter((r) => r.status === 'FAIL').length;
   console.log('\n--- Programmatic Test Results ---\n');

@@ -2,6 +2,12 @@
  * DOM Utilities - Helper functions for creating and manipulating DOM nodes
  */
 
+export function escapeHtml(value) {
+    const node = document.createElement('div');
+    node.textContent = String(value ?? '');
+    return node.innerHTML;
+}
+
 export function el(tag, attrs = {}, ...children) {
     const element = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {

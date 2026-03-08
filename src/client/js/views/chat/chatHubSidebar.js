@@ -6,8 +6,7 @@ export function bindHubSidebarControls({
     setSidebarState,
     clampSidebarWidth,
     navigate,
-    api,
-    showToast
+    createChatForAgent
 } = {}) {
     container.querySelectorAll('.chat-hub__group').forEach((group) => {
         const list = group.querySelector('.chat-hub__group-list');
@@ -149,16 +148,8 @@ export function bindHubSidebarControls({
 
     newChatList?.querySelectorAll('.chat-hub__new-chat-item').forEach((btn) => {
         btn.addEventListener('click', async () => {
-            try {
-                const { data } = await api('/chats', {
-                    method: 'POST',
-                    body: JSON.stringify({ agentId: btn.dataset.agent, forceNew: true })
-                });
-                closeNewChatPanel();
-                navigate(`/chat/${data.id}`);
-            } catch (err) {
-                showToast(err.message, 'error');
-            }
+            closeNewChatPanel();
+            try { await createChatForAgent(btn.dataset.agent); } catch {}
         });
     });
 }
