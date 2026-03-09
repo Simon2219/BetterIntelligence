@@ -4,7 +4,11 @@ const { getDb } = require('./dbState');
 function run(sql, params = []) {
     try {
         const db = getDb();
-        return { changes: db.prepare(sql).run(...params).changes };
+        const result = db.prepare(sql).run(...params);
+        return {
+            changes: result.changes,
+            lastInsertRowid: result.lastInsertRowid
+        };
     } catch (e) {
         log.error('Run error', { err: e.message });
         throw e;

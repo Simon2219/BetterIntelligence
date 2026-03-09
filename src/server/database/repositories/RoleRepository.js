@@ -1,7 +1,14 @@
 const { run, all, get } = require('../core/query');
 
 
-const PERMISSION_COLUMNS = ['can_access_admin', 'can_manage_settings', 'can_manage_roles', 'can_manage_users'];
+const PERMISSION_COLUMNS = [
+    'can_access_admin',
+    'can_manage_settings',
+    'can_manage_roles',
+    'can_manage_users',
+    'can_manage_marketplace',
+    'can_moderate_marketplace'
+];
 
 const RoleRepository = {
     getById(id) { return get('SELECT * FROM roles WHERE id = ?', [id]); },

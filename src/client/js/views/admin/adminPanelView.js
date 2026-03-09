@@ -14,6 +14,7 @@ import { renderDashboardTab } from './tabs/adminDashboardTab.js';
 import { renderRolesTab } from './tabs/adminRolesTab.js';
 import { renderColorsTab } from './tabs/adminColorsTab.js';
 import { createModelsTabRenderer } from './tabs/models/adminModelsTabView.js';
+import { renderCatalogTab } from './tabs/adminCatalogTab.js';
 import { renderSettingsTab } from './tabs/adminSettingsTab.js';
 
 export function createAdminView(deps) {
@@ -105,6 +106,11 @@ export function createAdminView(deps) {
 
         if (tab === 'settings') {
             await renderSettingsTab({ content, api, escapeHtml, showToast });
+            return;
+        }
+
+        if (tab === 'catalog') {
+            await renderCatalogTab({ content, api, escapeHtml, showToast });
         }
     }
 
@@ -117,6 +123,7 @@ export function createAdminView(deps) {
                     <button class="admin-main-tab admin-tab" data-tab="roles" data-admin-tab>Roles & Permissions</button>
                     <button class="admin-main-tab admin-tab" data-tab="colors" data-admin-tab>Color Scheme</button>
                     <button class="admin-main-tab admin-tab" data-tab="models" data-admin-tab>AI Models</button>
+                    <button class="admin-main-tab admin-tab" data-tab="catalog" data-admin-tab>Catalog Review</button>
                     <button class="admin-main-tab admin-tab" data-tab="settings" data-admin-tab>App Settings</button>
                 </div>
                 <div id="admin-content"></div>

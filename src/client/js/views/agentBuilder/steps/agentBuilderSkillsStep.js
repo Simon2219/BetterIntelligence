@@ -27,6 +27,7 @@ export function renderSkillsStep(content, context) {
                 api('/skills'),
                 api('/skills/categories').catch(() => ({ data: [] }))
             ]);
+            if (!content.isConnected) return;
             const el = container.querySelector('#skills-dnd-container');
             if (!el) return;
             const cats = categories || [];

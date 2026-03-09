@@ -67,6 +67,17 @@
     gap: 0.55rem;
 }
 
+.deploy-list-card__status {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.deploy-list-card__status-item {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
 .deploy-list-card__meta-label {
     font-size: 0.75rem;
     color: var(--text-muted);
@@ -137,6 +148,18 @@
 .deploy-chip--subtle {
     color: var(--text-secondary);
     background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+}
+
+.deploy-chip--warn {
+    color: var(--warning);
+    border-color: color-mix(in srgb, var(--warning) 42%, var(--border));
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.deploy-chip--danger {
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .deploy-create-panel {

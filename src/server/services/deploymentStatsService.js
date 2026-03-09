@@ -4,6 +4,15 @@
  */
 const DeploymentStatsRepository = require('../database/repositories/DeploymentStatsRepository');
 
+function parseJson(value, fallback) {
+    if (typeof value !== 'string') return value ?? fallback;
+    try {
+        return JSON.parse(value || 'null') ?? fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 function parseDays(value) {
     const parsed = parseInt(value, 10);
     if (!Number.isFinite(parsed) || parsed <= 0) return 30;
@@ -22,18 +31,51 @@ function percentileFromSorted(values, p) {
     return toInt(values[idx]);
 }
 
+function estimateCost(row) {
+    const metadata = parseJson(row?.metadata, {});
+    const promptRate = Number(metadata?.promptTokenCostUsd || 0);
+    const completionRate = Number(metadata?.completionTokenCostUsd || 0);
+    const imageRate = Number(metadata?.imageRequestCostUsd || 0);
+    return (
+        (toInt(row?.prompt_tokens) * promptRate)
+        + (toInt(row?.completion_tokens) * completionRate)
+        + (toInt(row?.requests) * imageRate)
+    );
+}
+
 function getDeploymentOperationalSummary(deploymentId) {
     const depId = parseInt(deploymentId, 10);
     if (!Number.isFinite(depId)) {
-        return { chatCount: 0, messageCount: 0, lastMessageAt: null };
+        return {
+            chatCount: 0,
+            messageCount: 0,
+            lastMessageAt: null,
+            requests30d: 0,
+            totalTokens30d: 0,
+            estimatedCostUsd30d: 0
+        };
     }
 
     const { chatRow, messageRow } = DeploymentStatsRepository.getOperationalCounts(depId);
+    const usageRows = DeploymentStatsRepository.getUsageCostRows(depId, new Date(Date.now() - (30 * 86400000)).toISOString());
+    const usageSummary = usageRows.reduce((acc, row) => {
+        acc.requests += toInt(row.requests);
+        acc.totalTokens += toInt(row.total_tokens);
+        acc.estimatedCostUsd += estimateCost(row);
+        return acc;
+    }, {
+        requests: 0,
+        totalTokens: 0,
+        estimatedCostUsd: 0
+    });
 
     return {
         chatCount: toInt(chatRow.chat_count),
         messageCount: toInt(messageRow.message_count),
-        lastMessageAt: chatRow.last_message_at || null
+        lastMessageAt: chatRow.last_message_at || null,
+        requests30d: usageSummary.requests,
+        totalTokens30d: usageSummary.totalTokens,
+        estimatedCostUsd30d: Number(usageSummary.estimatedCostUsd.toFixed(6))
     };
 }
 
@@ -57,6 +99,7 @@ function getDeploymentStats(deploymentId, opts = {}) {
     const chatRow = DeploymentStatsRepository.getChatCounts(depId, sinceIso);
     const messageRow = DeploymentStatsRepository.getMessageCounts(depId);
     const usageRow = DeploymentStatsRepository.getUsageTotals(depId, sinceIso);
+    const usageCostRows = DeploymentStatsRepository.getUsageCostRows(depId, sinceIso);
     const durationValues = DeploymentStatsRepository.getLatencyValues(depId, sinceIso)
         .map((row) => toInt(row.ms))
         .filter((value) => value > 0);
@@ -91,6 +134,7 @@ function getDeploymentStats(deploymentId, opts = {}) {
     const requests = toInt(usageRow.requests);
     const errors = toInt(usageRow.errors);
     const errorRate = requests > 0 ? Number(((errors / requests) * 100).toFixed(2)) : 0;
+    const estimatedCostUsd = usageCostRows.reduce((sum, row) => sum + estimateCost(row), 0);
 
     return {
         days,
@@ -107,10 +151,18 @@ function getDeploymentStats(deploymentId, opts = {}) {
             promptTokens: toInt(usageRow.prompt_tokens),
             completionTokens: toInt(usageRow.completion_tokens),
             totalTokens: toInt(usageRow.total_tokens),
+            estimatedCostUsd: Number(estimatedCostUsd.toFixed(6)),
             avgLatencyMs: toInt(Math.round(Number(usageRow.avg_latency_ms || 0))),
             p50LatencyMs: percentileFromSorted(durationValues, 0.5),
             p95LatencyMs: percentileFromSorted(durationValues, 0.95)
         },
+        models: usageCostRows.map((row) => ({
+            providerName: row.provider_name || '',
+            modelId: row.model_id || '',
+            requests: toInt(row.requests),
+            totalTokens: toInt(row.total_tokens),
+            estimatedCostUsd: Number(estimateCost(row).toFixed(6))
+        })),
         timeline: [...timelineMap.values()].sort((a, b) => String(a.day).localeCompare(String(b.day)))
     };
 }

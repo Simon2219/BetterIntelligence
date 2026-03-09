@@ -1,10 +1,29 @@
 import { deployBadgeClass, deployRoleLabel, normalizeDeployRole } from './deployPermissions.js';
-import { formatDeployTime, slugifyDeployValue } from './deployFormatters.js';
+import {
+    formatDeployAccessMode,
+    formatDeployTime,
+    slugifyDeployValue,
+    summarizeDeployQuota
+} from './deployFormatters.js';
+
+function runtimeHealthChip(runtimeHealth) {
+    const state = String(runtimeHealth?.state || 'unknown').toLowerCase();
+    if (state === 'ok') return { className: 'deploy-chip--ok', label: 'Ready' };
+    if (state === 'warning') return { className: 'deploy-chip--warn', label: 'Degraded' };
+    if (state === 'error') return { className: 'deploy-chip--danger', label: 'Blocked' };
+    return { className: 'deploy-chip--subtle', label: 'Unknown' };
+}
 
 function renderDeployListCard(row, { escapeHtml }) {
     const role = normalizeDeployRole(row?.access?.role);
     const embedOn = !!row?.status?.embedEnabled;
     const apiOn = !!row?.status?.apiEnabled;
+    const accessMode = formatDeployAccessMode(row?.accessPolicy?.consumer_access_mode);
+    const quotaLabel = summarizeDeployQuota(row?.accessPolicy?.sponsorQuota);
+    const pinnedRevision = row?.accessPolicy?.pinnedRevision?.revisionNumber
+        ? `Pinned r${row.accessPolicy.pinnedRevision.revisionNumber}`
+        : 'Live revision';
+    const health = runtimeHealthChip(row?.runtimeHealth);
     return `
         <button type="button" class="deploy-list-card" data-open-slug="${escapeHtml(row.slug || '')}">
             <div class="deploy-list-card__head">
@@ -15,12 +34,18 @@ function renderDeployListCard(row, { escapeHtml }) {
                 <div class="deploy-list-card__chips">
                     <span class="deploy-chip ${embedOn ? 'deploy-chip--ok' : 'deploy-chip--off'}">Embed ${embedOn ? 'On' : 'Off'}</span>
                     <span class="deploy-chip ${apiOn ? 'deploy-chip--ok' : 'deploy-chip--off'}">API ${apiOn ? 'On' : 'Off'}</span>
+                    <span class="deploy-chip deploy-chip--subtle">${escapeHtml(accessMode)}</span>
+                    <span class="deploy-chip ${health.className}" title="${escapeHtml(row?.runtimeHealth?.summary || '')}">${escapeHtml(health.label)}</span>
                 </div>
             </div>
             <div class="deploy-list-card__meta">
                 <div><div class="deploy-list-card__meta-label">Agent</div><div class="deploy-list-card__meta-value">${escapeHtml(row?.agent?.name || 'Unknown')}</div></div>
                 <div><div class="deploy-list-card__meta-label">Chats</div><div class="deploy-list-card__meta-value">${Number(row?.activity?.chatCount || 0).toLocaleString()}</div></div>
                 <div><div class="deploy-list-card__meta-label">Last Activity</div><div class="deploy-list-card__meta-value">${escapeHtml(formatDeployTime(row?.activity?.lastMessageAt))}</div></div>
+            </div>
+            <div class="deploy-list-card__status">
+                <span class="deploy-list-card__status-item">${escapeHtml(pinnedRevision)}</span>
+                <span class="deploy-list-card__status-item">${escapeHtml(quotaLabel)}</span>
             </div>
         </button>
     `;
@@ -41,14 +66,16 @@ export async function renderDeployList({
         const [deploymentsRes, agentsRes, hubAgentsRes] = await Promise.all([
             api(`/deploy${q ? `?q=${encodeURIComponent(q)}` : ''}`),
             api('/agents').catch(() => ({ data: [] })),
-            api('/agents/hub').catch(() => ({ data: [] }))
+            api('/hub/agents').catch(() => ({ data: [] }))
         ]);
         deployments = deploymentsRes?.data?.deployments || [];
         const merged = new Map();
         [...(agentsRes?.data || []), ...(hubAgentsRes?.data || [])].forEach((agent) => {
             if (agent?.id && !merged.has(agent.id)) merged.set(agent.id, agent);
         });
-        agents = [...merged.values()].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+        agents = [...merged.values()]
+            .filter((agent) => agent?.isOwner || agent?.market?.deployability?.allowed)
+            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     } catch (error) {
         container.innerHTML = `<div class="container"><p class="text-muted">${escapeHtml(error.message || 'Failed to load deployments')}</p></div>`;
         return;
@@ -79,6 +106,7 @@ export async function renderDeployList({
                             <option value="">Select an agent...</option>
                             ${agents.map((agent) => `<option value="${escapeHtml(agent.id)}">${escapeHtml(agent.name || agent.id)}</option>`).join('')}
                         </select>
+                        ${agents.length ? '' : '<div class="form-hint">No deployable agents are available for this account yet.</div>'}
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="deploy-create-slug">Slug</label>

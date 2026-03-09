@@ -5,6 +5,25 @@ import {
     normalizeDeployPermissions,
     deployBadgeClass
 } from '../deployPermissions.js';
+import { formatDeployAccessMode, summarizeDeployQuota } from '../deployFormatters.js';
+
+const POLICY_MODES = [
+    {
+        id: 'public_sponsored',
+        label: 'Public Sponsored',
+        description: 'Anonymous consumers use the attached sponsor grant and quota.'
+    },
+    {
+        id: 'authenticated_entitled',
+        label: 'Authenticated',
+        description: 'Consumers must sign in and hold an entitlement for this agent.'
+    },
+    {
+        id: 'internal_only',
+        label: 'Internal Only',
+        description: 'Only deployment managers can use the deployment runtime.'
+    }
+];
 
 function renderPermissionsGrid(perms, editable, escapeHtml) {
     return `
@@ -14,24 +33,135 @@ function renderPermissionsGrid(perms, editable, escapeHtml) {
     `;
 }
 
+function renderQuotaGrid(quota, escapeHtml) {
+    const metrics = Object.entries(quota?.metrics || {});
+    if (!metrics.length) {
+        return '<p class="text-muted">No sponsor quota is attached to this deployment.</p>';
+    }
+    return `
+        <div class="deploy-quota-grid">
+            ${metrics.map(([metricKey, metric]) => `
+                <div class="deploy-quota-item">
+                    <div class="deploy-quota-item__label">${escapeHtml(metricKey.replace(/^monthly_/, '').replace(/_/g, ' '))}</div>
+                    <div class="deploy-quota-item__value">${Number(metric.used || 0).toLocaleString()} / ${Number(metric.limit || 0).toLocaleString()}</div>
+                    <div class="deploy-quota-item__hint">${Number(metric.remaining || 0).toLocaleString()} left (${Number(metric.percentUsed || 0)}%)</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderPolicySection(policyData, capabilities, escapeHtml) {
+    const accessPolicy = policyData?.accessPolicy || {};
+    const runtimeHealth = policyData?.runtimeHealth || {};
+    const catalog = policyData?.catalog || {};
+    const revisions = Array.isArray(catalog?.revisions) ? catalog.revisions : [];
+    const sponsorGrantOptions = Array.isArray(catalog?.sponsorGrantOptions) ? catalog.sponsorGrantOptions : [];
+    const activeMode = String(accessPolicy?.consumer_access_mode || 'internal_only').trim().toLowerCase();
+    const activeRevisionId = accessPolicy?.pinned_revision_id || '';
+    const sponsorGrantId = accessPolicy?.sponsor_grant_id || '';
+    const runtimeState = String(runtimeHealth?.state || 'unknown').toLowerCase();
+    const runtimeLabel = runtimeState === 'ok'
+        ? 'Ready'
+        : runtimeState === 'warning'
+            ? 'Degraded'
+            : runtimeState === 'error'
+                ? 'Blocked'
+                : 'Unknown';
+
+    return `
+        <div class="card deploy-access-policy-card">
+            <div class="deploy-access__header-row">
+                <h3>Consumer Access Policy</h3>
+                <span class="deploy-chip ${runtimeState === 'ok' ? 'deploy-chip--ok' : runtimeState === 'warning' ? 'deploy-chip--warn' : runtimeState === 'error' ? 'deploy-chip--danger' : 'deploy-chip--subtle'}">${escapeHtml(runtimeLabel)}</span>
+            </div>
+            <div class="deploy-policy-grid">
+                <div class="deploy-policy-block">
+                    <div class="deploy-policy-block__label">Access mode</div>
+                    <div class="deploy-policy-mode-list">
+                        ${POLICY_MODES.map((mode) => `
+                            <button
+                                type="button"
+                                class="deploy-range-btn ${activeMode === mode.id ? 'deploy-range-btn--active' : ''}"
+                                data-policy-mode="${mode.id}"
+                                ${capabilities.canManageConfig ? '' : 'disabled'}
+                            >${escapeHtml(mode.label)}</button>
+                        `).join('')}
+                    </div>
+                    <div class="form-hint">${escapeHtml(POLICY_MODES.find((mode) => mode.id === activeMode)?.description || 'No policy description')}</div>
+                </div>
+                <div class="deploy-policy-block">
+                    <label class="form-label" for="deploy-policy-revision">Pinned revision</label>
+                    <select id="deploy-policy-revision" class="form-input" ${capabilities.canManageConfig ? '' : 'disabled'}>
+                        <option value="">Use current approved/runtime revision</option>
+                        ${revisions.map((revision) => `
+                            <option value="${escapeHtml(revision.id)}" ${String(activeRevisionId) === String(revision.id) ? 'selected' : ''}>
+                                Revision ${Number(revision.revisionNumber || 0)} · ${escapeHtml(revision.title || 'Untitled')} · ${escapeHtml(revision.reviewStatus || 'draft')}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="deploy-policy-block">
+                    <label class="form-label" for="deploy-policy-sponsor-grant">Sponsor grant</label>
+                    <select id="deploy-policy-sponsor-grant" class="form-input" ${capabilities.canManageConfig ? '' : 'disabled'}>
+                        <option value="">No sponsor grant</option>
+                        ${sponsorGrantOptions.map((grant) => `
+                            <option value="${escapeHtml(grant.id)}" ${String(sponsorGrantId) === String(grant.id) ? 'selected' : ''}>
+                                ${escapeHtml(grant.grantType || 'grant')} · ${escapeHtml(grant.subjectType || 'subject')} · ${escapeHtml(summarizeDeployQuota(grant.quota))}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="deploy-policy-block">
+                    <div class="deploy-policy-block__label">Runtime summary</div>
+                    <div class="deploy-inline-value">${escapeHtml(runtimeHealth?.summary || 'No runtime summary')}</div>
+                    <div class="form-hint">Current mode: ${escapeHtml(formatDeployAccessMode(accessPolicy?.consumer_access_mode))}</div>
+                </div>
+            </div>
+            ${renderQuotaGrid(accessPolicy?.sponsorQuota, escapeHtml)}
+            ${capabilities.canManageConfig ? `
+                <div class="deploy-config-form__actions">
+                    <button class="btn btn-primary" type="button" id="deploy-policy-save">Save Policy</button>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
 export async function renderDeployAccessTab({
     content,
     slug,
+    data,
     capabilities,
     api,
     showToast,
     showConfirm,
     escapeHtml
 }) {
-    if (!capabilities.canManageMembers) {
-        content.innerHTML = '<div class="card"><p class="text-muted">You do not have access to manage deployment members.</p></div>';
+    if (!capabilities.canManageMembers && !capabilities.canManageConfig) {
+        content.innerHTML = '<div class="card"><p class="text-muted">You do not have access to manage deployment settings.</p></div>';
         return;
     }
 
+    let policyData = capabilities.canManageConfig ? {
+        accessPolicy: data?.accessPolicy || null,
+        runtimeHealth: data?.runtimeHealth || null,
+        catalog: data?.catalog || null
+    } : null;
     let members = [];
     let searchResults = [];
 
+    const loadPolicy = async () => {
+        if (!capabilities.canManageConfig) return;
+        const response = await api(`/deploy/${encodeURIComponent(slug)}/access-policy`);
+        policyData = response?.data || { accessPolicy: null, runtimeHealth: null, catalog: null };
+    };
+
     const loadMembers = async () => {
+        if (!capabilities.canManageMembers) {
+            members = [];
+            return;
+        }
         const response = await api(`/deploy/${encodeURIComponent(slug)}/members`);
         members = response?.data?.members || [];
     };
@@ -80,17 +210,56 @@ export async function renderDeployAccessTab({
     };
 
     const refresh = async () => {
-        await loadMembers();
+        await Promise.all([
+            loadPolicy(),
+            loadMembers()
+        ]);
+
         content.innerHTML = `
             <div class="deploy-access">
-                <div class="card">
-                    <div class="deploy-access__header-row"><h3>Access & Permissions</h3><span class="deploy-chip deploy-chip--subtle">${Number(members.length).toLocaleString()} members</span></div>
-                    <form id="deploy-member-search-form" class="deploy-member-search-form"><input id="deploy-member-search-input" class="form-input" type="search" placeholder="Find by userId or username"><button class="btn btn-tonal" type="submit">Search</button></form>
-                    <div id="deploy-member-search-results" class="deploy-member-search-results">${searchResults.length ? searchResults.map((user) => renderSearchResult(user)).join('') : ''}</div>
-                </div>
-                <div class="card deploy-members-list">${members.length ? members.map((member) => renderMemberRow(member)).join('') : '<p class="text-muted">No members found.</p>'}</div>
+                ${capabilities.canManageConfig ? renderPolicySection(policyData, capabilities, escapeHtml) : ''}
+                ${capabilities.canManageMembers ? `
+                    <div class="card">
+                        <div class="deploy-access__header-row"><h3>Manager Access</h3><span class="deploy-chip deploy-chip--subtle">${Number(members.length).toLocaleString()} members</span></div>
+                        <form id="deploy-member-search-form" class="deploy-member-search-form"><input id="deploy-member-search-input" class="form-input" type="search" placeholder="Find by userId or username"><button class="btn btn-tonal" type="submit">Search</button></form>
+                        <div id="deploy-member-search-results" class="deploy-member-search-results">${searchResults.length ? searchResults.map((user) => renderSearchResult(user)).join('') : ''}</div>
+                    </div>
+                    <div class="card deploy-members-list">${members.length ? members.map((member) => renderMemberRow(member)).join('') : '<p class="text-muted">No members found.</p>'}</div>
+                ` : ''}
             </div>
         `;
+
+        content.querySelectorAll('[data-policy-mode]').forEach((button) => {
+            button.addEventListener('click', () => {
+                if (button.disabled) return;
+                content.querySelectorAll('[data-policy-mode]').forEach((item) => item.classList.toggle('deploy-range-btn--active', item === button));
+            });
+        });
+
+        content.querySelector('#deploy-policy-save')?.addEventListener('click', async () => {
+            const saveButton = content.querySelector('#deploy-policy-save');
+            if (!saveButton) return;
+            saveButton.disabled = true;
+            try {
+                const activeMode = content.querySelector('[data-policy-mode].deploy-range-btn--active')?.getAttribute('data-policy-mode') || 'internal_only';
+                const pinnedRevisionId = String(content.querySelector('#deploy-policy-revision')?.value || '').trim();
+                const sponsorGrantId = String(content.querySelector('#deploy-policy-sponsor-grant')?.value || '').trim();
+                policyData = (await api(`/deploy/${encodeURIComponent(slug)}/access-policy`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        consumerAccessMode: activeMode,
+                        pinnedRevisionId: pinnedRevisionId || null,
+                        sponsorGrantId: sponsorGrantId || null
+                    })
+                }))?.data || policyData;
+                showToast('Deployment access policy updated', 'success');
+                await refresh();
+            } catch (error) {
+                showToast(error.message || 'Failed to update deployment access policy', 'error');
+            } finally {
+                saveButton.disabled = false;
+            }
+        });
 
         content.querySelectorAll('.deploy-member').forEach((row) => {
             row.querySelectorAll('[data-role-value]').forEach((btn) => {

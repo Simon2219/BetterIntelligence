@@ -1,18 +1,38 @@
 const express = require('express');
 const router = express.Router();
-const { AIAgentRepository, SkillRepository, SubscriptionRepository, TagRepository, AgentCategoryRepository, UserPrivateTagRepository } = require('../database');
+const {
+    AIAgentRepository,
+    SkillRepository,
+    TagRepository,
+    AgentCategoryRepository,
+    UserPrivateTagRepository,
+    CatalogEntitlementRepository,
+    CatalogListingRepository
+} = require('../database');
 const { authenticate } = require('../middleware/auth');
 const { hydrateAgentModelAvailability } = require('../ai/services/agentAvailabilityService');
+const catalogEntitlementService = require('../services/catalogEntitlementService');
+const catalogService = require('../services/catalogService');
+const accDashboardService = require('../services/accDashboardService');
 const { safeErrorMessage } = require('../utils/httpErrors');
 
-function attachSkillIds(agent) {
+function attachSkillIds(agent, userId) {
     if (!agent) return agent;
-    agent.skillIds = SkillRepository.getAgentSkillIds(agent.id);
+    if (Array.isArray(agent.skillIds)) return agent;
+    agent.skillIds = SkillRepository.getAgentSkillEntryIds(agent.id, userId || agent.user_id);
     return agent;
 }
 
 function attachTags(agent) {
     if (!agent) return agent;
+    if (Array.isArray(agent.tags)) {
+        if (!agent.tags.length) return agent;
+        if (typeof agent.tags[0] === 'object' && agent.tags[0]?.name) return agent;
+        if (typeof agent.tags[0] === 'string') {
+            agent.tags = agent.tags.map((tag) => ({ id: tag, name: tag }));
+            return agent;
+        }
+    }
     agent.tags = TagRepository.getAgentTagIds(agent.id).map(tid => {
         const t = TagRepository.getById(tid);
         return t ? { id: t.id, name: t.name } : null;
@@ -22,8 +42,35 @@ function attachTags(agent) {
 
 function attachSubscription(agent, userId) {
     if (!agent) return agent;
-    agent.isSubscribed = SubscriptionRepository.isSubscribed(userId, agent.id);
+    const entitlement = catalogEntitlementService.resolveAssetEntitlement({
+        userId,
+        assetType: 'agent',
+        assetId: agent.id,
+        action: 'chat'
+    });
     agent.isOwner = agent.user_id && agent.user_id.toUpperCase() === userId.toUpperCase();
+    agent.isSubscribed = !agent.isOwner && (
+        entitlement.source === 'legacy_subscription'
+        || !!entitlement.grant
+        || !!entitlement.derivedGrant
+    );
+    agent.entitlement = entitlement;
+    agent.market = {
+        listingId: entitlement.listing?.id || null,
+        status: entitlement.listing?.status || null,
+        visibility: entitlement.listing?.visibility || null,
+        source: entitlement.source,
+        featureGates: entitlement.featureGates,
+        quota: entitlement.quota,
+        review: entitlement.revision ? {
+            revisionId: entitlement.revision.id,
+            reviewStatus: entitlement.revision.review_status
+        } : null,
+        deployability: {
+            allowed: !!entitlement.allowed && entitlement.featureGates?.can_deploy !== false,
+            reason: entitlement.allowed ? null : entitlement.reason
+        }
+    };
     return agent;
 }
 
@@ -46,13 +93,74 @@ function attachAvailability(agent) {
 
 function enrichAgent(agent, userId) {
     if (!agent) return agent;
-    attachSkillIds(agent);
+    attachSkillIds(agent, userId);
     attachAvailability(agent);
     attachCategoryIds(agent);
     attachTags(agent);
     attachPrivateTags(agent, userId);
     attachSubscription(agent, userId);
+    delete agent.hub_published;
     return agent;
+}
+
+function hydrateAgentSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    return hydrateAgentModelAvailability({
+        ...snapshot,
+        personality: catalogService.parseJson(snapshot.personality, {}),
+        behavior_rules: catalogService.parseJson(snapshot.behavior_rules, {}),
+        sample_dialogues: catalogService.parseJson(snapshot.sample_dialogues, []),
+        stop_sequences: catalogService.parseJson(snapshot.stop_sequences, []),
+        metadata: catalogService.parseJson(snapshot.metadata, {}),
+        is_active: snapshot.is_active === false ? false : snapshot.is_active !== 0
+    }, { clone: true });
+}
+
+function getApprovedAgentRevision(agentId) {
+    const listing = catalogService.listPublicListings({ assetType: 'agent', limit: 500 })
+        .find((item) => String(item.asset_id) === String(agentId));
+    return listing?.activeRevision || null;
+}
+
+function getApprovedAgentForPublicListing(agentId) {
+    const revision = getApprovedAgentRevision(agentId);
+    if (!revision?.snapshot) return null;
+    return hydrateAgentSnapshot(revision.snapshot);
+}
+
+function getSharedAgentFromEntitlement(entitlement, fallbackAgentId) {
+    const agent = catalogEntitlementService.getRuntimeAgentForResolvedEntitlement(entitlement, fallbackAgentId);
+    if (!agent) return null;
+    return hydrateAgentSnapshot(agent);
+}
+
+function getGrantedAgentIds(userId) {
+    const ids = new Set();
+    const directGrants = CatalogEntitlementRepository.listGrantsForSubject('user', userId, {
+        status: 'active',
+        assetType: 'agent'
+    });
+    directGrants.forEach((grant) => {
+        if (grant.asset_id) ids.add(String(grant.asset_id));
+    });
+
+    const bundleGrants = CatalogEntitlementRepository.listGrantsForSubject('user', userId, {
+        status: 'active',
+        assetType: 'bundle'
+    });
+    bundleGrants.forEach((grant) => {
+        const bundleItems = CatalogListingRepository.listBundleItems(
+            grant.listing_id,
+            grant.revision_id && String(grant.revision_id).startsWith('mrev_') ? grant.revision_id : null
+        );
+        bundleItems.forEach((item) => {
+            if (String(item.item_type || '').toLowerCase() === 'agent' && item.item_id) {
+                ids.add(String(item.item_id));
+            }
+        });
+    });
+
+    return [...ids];
 }
 
 const SAFE_AVATAR_URL_RE = /^(https?:\/\/|\/media\/|\/|data:image\/)/i;
@@ -68,7 +176,7 @@ function validateAgentData(data) {
             errors.push('Avatar URL must use http, https, or a relative media path');
         }
     }
-    if (data.tagline !== undefined && data.tagline.length > 200) errors.push('Tagline must be under 200 characters');
+    if (data.tagline != null && String(data.tagline).length > 200) errors.push('Tagline must be under 200 characters');
     if (data.temperature !== undefined) {
         const t = Number(data.temperature);
         if (isNaN(t) || t < 0 || t > 2) errors.push('Temperature must be between 0 and 2');
@@ -177,10 +285,24 @@ router.get('/tags', authenticate, (req, res) => {
     }
 });
 
+router.get('/dashboard', authenticate, (req, res) => {
+    try {
+        const days = req.query.days ? parseInt(req.query.days, 10) : 30;
+        const compareDays = req.query.compareDays ? parseInt(req.query.compareDays, 10) : null;
+        const sections = req.query.sections
+            ? String(req.query.sections).split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
+            : null;
+        const data = accDashboardService.getDashboard(req.user, { days, compareDays, sections });
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
 router.get('/', authenticate, (req, res) => {
     try {
         const own = AIAgentRepository.list({ userId: req.user.id, limit: 100 });
-        const subIds = SubscriptionRepository.listSubscribedAgentIds(req.user.id);
+        const subIds = getGrantedAgentIds(req.user.id);
         const subAgents = subIds
             .filter(id => !own.some(a => a.id === id))
             .map(id => AIAgentRepository.getById(id))
@@ -196,10 +318,17 @@ router.post('/', authenticate, (req, res) => {
     try {
         let data = { ...req.body, userId: req.user.id };
         if (req.body.copyFrom) {
-            const src = AIAgentRepository.getById(req.body.copyFrom);
-            if (!src) return res.status(404).json({ success: false, error: 'Source agent not found' });
-            const canCopy = src.user_id?.toUpperCase() === req.user.id.toUpperCase() || SubscriptionRepository.isSubscribed(req.user.id, src.id) || (src.hub_published === 1);
-            if (!canCopy) return res.status(403).json({ success: false, error: 'Cannot copy this agent' });
+            const liveSource = AIAgentRepository.getById(req.body.copyFrom);
+            if (!liveSource) return res.status(404).json({ success: false, error: 'Source agent not found' });
+            let entitlement = null;
+            try {
+                entitlement = catalogEntitlementService.assertUserCanCopyAgent({ userId: req.user.id, agentId: liveSource.id });
+            } catch {
+                return res.status(403).json({ success: false, error: 'Cannot copy this agent' });
+            }
+            const src = liveSource?.user_id && liveSource.user_id.toUpperCase() === req.user.id.toUpperCase()
+                ? liveSource
+                : (getSharedAgentFromEntitlement(entitlement, liveSource.id) || getApprovedAgentForPublicListing(liveSource.id) || liveSource);
             data = {
                 name: (req.body.name || src.name) + ' (Copy)',
                 tagline: src.tagline,
@@ -225,7 +354,9 @@ router.post('/', authenticate, (req, res) => {
                 verbosity: src.verbosity,
                 userId: req.user.id
             };
-            data.skillIds = SkillRepository.getAgentSkillIds(src.id);
+            data.skillIds = Array.isArray(src.skillIds) && src.skillIds.length
+                ? [...src.skillIds]
+                : SkillRepository.getAgentSkillEntryIds(src.id, req.user.id);
         }
         const errors = validateAgentData({ ...data, name: data.name || '' });
         if (!data.name || !data.name.trim()) errors.unshift('Name is required');
@@ -243,57 +374,50 @@ router.post('/', authenticate, (req, res) => {
     }
 });
 
-router.get('/hub', authenticate, (req, res) => {
+// Catch-all for legacy /agents/hub paths that should route to /hub instead
+router.all('/hub', (req, res) => {
+    res.status(404).json({ success: false, error: 'Not found' });
+});
+
+router.get('/:id', authenticate, (req, res) => {
     try {
-        const agents = AIAgentRepository.listHubPublished(100);
-        const withMeta = agents.map(a => {
-            const parsed = AIAgentRepository.getById ? AIAgentRepository.getById(a.id) : a;
-            return enrichAgent(parsed || a, req.user.id);
+        const live = AIAgentRepository.getById(req.params.id);
+        const entitlement = catalogEntitlementService.resolveAssetEntitlement({
+            userId: req.user.id,
+            assetType: 'agent',
+            assetId: req.params.id
         });
-        res.json({ success: true, data: withMeta });
+        const liveOwner = live?.user_id && live.user_id.toUpperCase() === req.user.id.toUpperCase();
+        const approvedSnapshot = getApprovedAgentForPublicListing(req.params.id);
+        const sharedSnapshot = getSharedAgentFromEntitlement(entitlement, req.params.id);
+        const a = liveOwner ? (live || approvedSnapshot) : (sharedSnapshot || approvedSnapshot || live);
+        if (!a) return res.status(404).json({ success: false, error: 'Agent not found' });
+        const isOwner = !!liveOwner;
+        if (!isOwner && !entitlement.allowed) {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+        const out = enrichAgent(a, req.user.id);
+        if (!isOwner) {
+            delete out.system_prompt;
+            delete out.personality;
+            delete out.behavior_rules;
+            delete out.sample_dialogues;
+            delete out.backstory;
+        }
+        res.json({ success: true, data: out });
     } catch (err) {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
-router.get('/:id', authenticate, (req, res) => {
-    const a = AIAgentRepository.getById(req.params.id);
-    if (!a) return res.status(404).json({ success: false, error: 'Agent not found' });
-    const isOwner = a.user_id && a.user_id.toUpperCase() === req.user.id.toUpperCase();
-    const isSub = SubscriptionRepository.isSubscribed(req.user.id, a.id);
-    if (!isOwner && !isSub && a.hub_published !== 1) {
-        return res.status(403).json({ success: false, error: 'Forbidden' });
-    }
-    const out = enrichAgent(a, req.user.id);
-    if (!isOwner) {
-        delete out.system_prompt;
-        delete out.personality;
-        delete out.behavior_rules;
-        delete out.sample_dialogues;
-        delete out.backstory;
-    }
-    res.json({ success: true, data: out });
-});
-
-router.post('/:id/subscribe', authenticate, (req, res) => {
-    const a = AIAgentRepository.getById(req.params.id);
-    if (!a) return res.status(404).json({ success: false, error: 'Agent not found' });
-    if (a.hub_published !== 1 && a.user_id?.toUpperCase() !== req.user.id.toUpperCase()) {
-        return res.status(403).json({ success: false, error: 'Agent not available to subscribe' });
-    }
-    SubscriptionRepository.subscribe(req.user.id, req.params.id);
-    res.json({ success: true });
-});
-
-router.delete('/:id/subscribe', authenticate, (req, res) => {
-    SubscriptionRepository.unsubscribe(req.user.id, req.params.id);
-    res.json({ success: true });
-});
-
 router.put('/:id/private-tags', authenticate, (req, res) => {
     const a = AIAgentRepository.getById(req.params.id);
     if (!a) return res.status(404).json({ success: false, error: 'Agent not found' });
-    const canAccess = a.user_id?.toUpperCase() === req.user.id.toUpperCase() || SubscriptionRepository.isSubscribed(req.user.id, a.id) || a.hub_published === 1;
+    const canAccess = catalogEntitlementService.resolveAssetEntitlement({
+        userId: req.user.id,
+        assetType: 'agent',
+        assetId: a.id
+    }).allowed;
     if (!canAccess) return res.status(403).json({ success: false, error: 'Forbidden' });
     try {
         const { tagIds } = req.body;
@@ -339,7 +463,20 @@ router.put('/:id', authenticate, (req, res) => {
         return res.status(403).json({ success: false, error: 'Forbidden' });
     }
     try {
-        const { skillIds, tagNames, ...rest } = req.body;
+        const ALLOWED_UPDATE_FIELDS = [
+            'name', 'tagline', 'description', 'avatarUrl', 'systemPrompt', 'personality',
+            'backstory', 'temperature', 'maxTokens', 'topP', 'topK',
+            'repeatPenalty', 'presencePenalty', 'frequencyPenalty', 'stopSequences',
+            'greetingMessage', 'responseFormat', 'contextWindow', 'memoryStrategy',
+            'formality', 'verbosity', 'textProvider', 'textModel',
+            'imageProvider', 'imageModel', 'behaviorRules', 'sampleDialogues',
+            'metadata', 'visibility', 'status', 'categoryId'
+        ];
+        const { skillIds, tagNames, ...rawRest } = req.body;
+        const rest = {};
+        for (const key of ALLOWED_UPDATE_FIELDS) {
+            if (key in rawRest) rest[key] = rawRest[key];
+        }
         const errors = validateAgentData(rest);
         if (errors.length) return res.status(400).json({ success: false, error: errors.join('; ') });
         const updated = AIAgentRepository.update(req.params.id, rest);
@@ -355,14 +492,19 @@ router.put('/:id', authenticate, (req, res) => {
 });
 
 router.delete('/:id', authenticate, (req, res) => {
-    const a = AIAgentRepository.getById(req.params.id);
-    if (!a) return res.status(404).json({ success: false, error: 'Agent not found' });
-    if (a.user_id && a.user_id.toUpperCase() !== req.user.id.toUpperCase()) {
-        return res.status(403).json({ success: false, error: 'Forbidden' });
+    try {
+        const a = AIAgentRepository.getById(req.params.id);
+        if (!a) return res.status(404).json({ success: false, error: 'Agent not found' });
+        if (a.user_id && a.user_id.toUpperCase() !== req.user.id.toUpperCase()) {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+        AIAgentRepository.delete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
-    AIAgentRepository.delete(req.params.id);
-    res.json({ success: true });
 });
 
 module.exports = router;
+
 

@@ -27,11 +27,11 @@ export async function renderModelStep(content, context) {
         <div class="provider-status-bar">
             <div class="provider-status">
                 <span class="status-dot ${providers.some((provider) => provider.capabilities?.text && provider.available) ? 'status-dot--online' : 'status-dot--offline'}"></span>
-                Text AI: ${textProviders.length ? textProviders.map((provider) => `${provider.displayName || provider.name} (${provider.available ? 'online' : 'offline' + (provider.error ? ': ' + provider.error : '')})`).join(', ') : 'none configured'}
+                Text AI: ${textProviders.length ? textProviders.map((provider) => `${provider.displayName || provider.name} (${provider.available ? 'online' : 'offline'}${!provider.available && provider.error ? ': ' + provider.error : ''})`).join(', ') : 'none configured'}
             </div>
             <div class="provider-status">
                 <span class="status-dot ${providers.some((provider) => provider.capabilities?.image && provider.available) ? 'status-dot--online' : 'status-dot--offline'}"></span>
-                Image AI: ${imageProviders.length ? imageProviders.map((provider) => `${provider.displayName || provider.name} (${provider.available ? 'online' : 'offline' + (provider.error ? ': ' + provider.error : '')})`).join(', ') : 'none configured'}
+                Image AI: ${imageProviders.length ? imageProviders.map((provider) => `${provider.displayName || provider.name} (${provider.available ? 'online' : 'offline'}${!provider.available && provider.error ? ': ' + provider.error : ''})`).join(', ') : 'none configured'}
             </div>
         </div>
         <div class="form-row">
@@ -245,7 +245,6 @@ export async function renderModelStep(content, context) {
     });
 
     textModelSel.addEventListener('change', () => {
-        syncModelStepDisplays();
         populateModelDropdown({
             selectEl: textModelSel,
             providerName: textProvSel.value,
@@ -259,7 +258,6 @@ export async function renderModelStep(content, context) {
     });
 
     imgModelSel.addEventListener('change', () => {
-        syncModelStepDisplays();
         populateModelDropdown({
             selectEl: imgModelSel,
             providerName: imgProvSel.value,

@@ -129,6 +129,9 @@
     "maxTokens": 512,
     "historyMessagesLimit": 50
   },
+  "billing": {
+    "provider": "none"
+  },
   "rateLimit": {
     "windowMs": 900000,
     "maxRequests": 1000

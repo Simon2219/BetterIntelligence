@@ -10,4 +10,51 @@
 .hub-badge-success { background: var(--success); color: #fff; }
 .hub-detail-card { max-width: 37.5rem; margin-top: 1rem; }
 .hub-detail-meta { margin: 0.75rem 0; }
-
+.hub-detail-bio {
+    margin: 0 0 1rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+.hub-personality-card {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: var(--radius);
+    border: 0.0625rem solid var(--border);
+    background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+}
+.hub-personality-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.hub-personality-card__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+.hub-personality-card__meta {
+    margin-top: 0.2rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+.hub-personality-card__body {
+    display: grid;
+    grid-template-columns: minmax(7rem, 8rem) 1fr;
+    gap: 1rem;
+    align-items: center;
+}
+.hub-personality-card svg {
+    width: 100%;
+    height: auto;
+}
+.hub-personality-card__traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+@media (max-width: 40rem) {
+    .hub-personality-card__body {
+        grid-template-columns: 1fr;
+    }
+}

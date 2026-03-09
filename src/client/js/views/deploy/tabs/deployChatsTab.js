@@ -1,6 +1,7 @@
 export async function renderDeployChatsTab({
     content,
     slug,
+    data,
     capabilities,
     api,
     showToast,
@@ -30,6 +31,11 @@ export async function renderDeployChatsTab({
         await loadChats();
         const selected = chats.find((chat) => String(chat.id).toUpperCase() === String(selectedId).toUpperCase()) || null;
         const messages = selected ? await loadMessages(selected.id) : [];
+        const runtimeHealth = data?.runtimeHealth || {};
+        const runtimeState = String(runtimeHealth?.state || 'unknown').toLowerCase();
+        const runtimeNotice = runtimeState === 'ok'
+            ? ''
+            : `<div class="deploy-runtime-banner deploy-runtime-banner--${escapeHtml(runtimeState)}">${escapeHtml(runtimeHealth?.summary || 'Deployment runtime is degraded')}</div>`;
 
         content.innerHTML = `
             <div class="deploy-chats">
@@ -44,6 +50,7 @@ export async function renderDeployChatsTab({
                     </div>
                 </div>
                 <div class="deploy-chats__thread card">
+                    ${runtimeNotice}
                     ${selected ? `
                         <div class="deploy-thread__header"><h3>Chat ${escapeHtml(selected.id)}</h3><span class="deploy-chip deploy-chip--subtle">${escapeHtml(formatDeployTime(selected.last_message_at || selected.updated_at || selected.created_at))}</span></div>
                         <div class="deploy-thread__messages" id="deploy-thread-messages">${messages.length ? messages.map((message) => renderDeployMessage(message, selected.ai_agent_id || selected.agent_id)).join('') : '<p class="text-muted">No messages yet.</p>'}</div>

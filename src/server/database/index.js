@@ -16,11 +16,14 @@ const { AgentCategoryRepository, SkillCategoryRepository } = require('./reposito
 const UserPrivateTagRepository = require('./repositories/UserPrivateTagRepository');
 const HookConfigRepository = require('./repositories/HookConfigRepository');
 const SkillRepository = require('./repositories/SkillRepository');
-const SkillRegistryRepository = require('./repositories/SkillRegistryRepository');
+const SkillInstallationRepository = require('./repositories/SkillInstallationRepository');
 const KnowledgeRepository = require('./repositories/KnowledgeRepository');
 const AnalyticsRepository = require('./repositories/AnalyticsRepository');
-const SubscriptionRepository = require('./repositories/SubscriptionRepository');
 const TagRepository = require('./repositories/TagRepository');
+const CatalogListingRepository = require('./repositories/CatalogListingRepository');
+const CatalogEntitlementRepository = require('./repositories/CatalogEntitlementRepository');
+const DeploymentAccessPolicyRepository = require('./repositories/DeploymentAccessPolicyRepository');
+const UsageAttributionRepository = require('./repositories/UsageAttributionRepository');
 
 module.exports = {
     initializeDatabase: connection.initDb,
@@ -47,10 +50,12 @@ module.exports = {
     UserPrivateTagRepository,
     HookConfigRepository,
     SkillRepository,
-    SkillRegistryRepository,
+    SkillInstallationRepository,
     KnowledgeRepository,
     AnalyticsRepository,
-    SubscriptionRepository,
-    TagRepository
+    TagRepository,
+    CatalogListingRepository,
+    CatalogEntitlementRepository,
+    DeploymentAccessPolicyRepository,
+    UsageAttributionRepository
 };
-

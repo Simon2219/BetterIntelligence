@@ -2,12 +2,12 @@
 /**
  * Run full API test matrix from the plan.
  * Usage: node scripts/run-api-tests.js [baseUrl]
- * Default baseUrl: http://localhost:3000
+ * Default baseUrl: https://localhost:3001
  */
 const http = require('http');
 const https = require('https');
 
-const BASE = process.argv[2] || 'http://localhost:3000';
+const BASE = process.argv[2] || 'https://localhost:3001';
 let token = null;
 let userId = null;
 let agentId = null;
@@ -15,10 +15,17 @@ let chatId = null;
 let slug = null;
 let hookId = null;
 let cookies = [];
+let adminToken = null;
+let consumerToken = null;
+let consumerUserId = null;
 
 const results = [];
 
-function request(method, path, body = null, useAuth = false, rawBody = false) {
+function recordResult(name, ok, extra = {}) {
+    results.push({ name, ok, ...extra });
+}
+
+function request(method, path, body = null, useAuth = false, rawBody = false, authToken = null) {
     return new Promise((resolve, reject) => {
         const url = new URL(path, BASE);
         const opts = {
@@ -29,7 +36,8 @@ function request(method, path, body = null, useAuth = false, rawBody = false) {
             headers: { 'Content-Type': 'application/json' },
             rejectUnauthorized: false
         };
-        if (useAuth && token) opts.headers['Authorization'] = `Bearer ${token}`;
+        const resolvedToken = authToken || token;
+        if (useAuth && resolvedToken) opts.headers['Authorization'] = `Bearer ${resolvedToken}`;
         if (cookies.length) opts.headers['Cookie'] = cookies.join('; ');
         const lib = url.protocol === 'https:' ? https : http;
         const req = lib.request(opts, (res) => {
@@ -52,7 +60,7 @@ function request(method, path, body = null, useAuth = false, rawBody = false) {
 function test(name, method, path, body, useAuth, expectStatus, expectKey) {
     return request(method, path, body, useAuth).then(res => {
         const ok = Array.isArray(expectStatus) ? expectStatus.includes(res.status) : res.status === expectStatus;
-        results.push({ name, ok, status: res.status, expect: expectStatus });
+        recordResult(name, ok, { status: res.status, expect: expectStatus });
         if (expectKey && res.data && res.data.data) {
             if (expectKey === 'accessToken' && res.data.data.accessToken) token = res.data.data.accessToken;
             if (expectKey === 'id' && res.data.data.id) userId = res.data.data.id;
@@ -63,7 +71,7 @@ function test(name, method, path, body, useAuth, expectStatus, expectKey) {
         }
         return res;
     }).catch(err => {
-        results.push({ name, ok: false, error: err.message });
+        recordResult(name, false, { error: err.message });
     });
 }
 
@@ -97,7 +105,7 @@ async function run() {
 
     // 4.3 Agents
     await test('Agents: List', 'GET', '/api/agents', null, true, 200);
-    await test('Agents: Create', 'POST', '/api/agents', { name: 'Test Agent', system_prompt: 'Hello', temperature: 0.7 }, true, 201, 'agentId');
+    await test('Agents: Create', 'POST', '/api/agents', { name: 'Test Agent', systemPrompt: 'Hello from the private prompt', temperature: 0.7 }, true, 201, 'agentId');
     if (!agentId) agentId = (await request('GET', '/api/agents', null, true)).data?.data?.[0]?.id;
     await test('Agents: Create invalid', 'POST', '/api/agents', { name: '', temperature: 5 }, true, 400);
     await test('Agents: Get', 'GET', '/api/agents/' + (agentId || 'x'), null, true, 200);
@@ -144,10 +152,183 @@ async function run() {
     await test('Deploy: Chat', 'POST', '/api/deploy/' + slug + '/chat', { message: 'Hi' }, false, 200);
     await test('Deploy: Chat no message', 'POST', '/api/deploy/' + slug + '/chat', {}, false, 400);
 
-    // 4.7 Hub
+    const adminLoginRes = await request('POST', '/api/auth/login', { login: 'admin@betterintelligence.com', password: 'AdminPass123!' }, false);
+    adminToken = adminLoginRes.data?.data?.accessToken || null;
+    recordResult('Auth: Admin login', adminLoginRes.status === 200 && !!adminToken, { status: adminLoginRes.status, expect: 200 });
+    const consumerTs = Date.now();
+    const consumerEmail = `consumer-${consumerTs}@example.com`;
+    const consumerUsername = `consumer${consumerTs}`;
+    const consumerSignupRes = await request('POST', '/api/auth/signup', {
+        email: consumerEmail,
+        password: 'Test123!',
+        displayName: 'Consumer',
+        username: consumerUsername
+    }, false);
+    consumerToken = consumerSignupRes.data?.data?.accessToken || null;
+    consumerUserId = consumerSignupRes.data?.data?.user?.id || null;
+    recordResult('Auth: Consumer signup', consumerSignupRes.status === 201 && !!consumerToken, { status: consumerSignupRes.status, expect: 201 });
+
+    // 4.7 Catalog + Hub
     await test('Hub: List skills', 'GET', '/api/hub/skills', null, false, 200);
-    await test('Hub: Publish', 'POST', '/api/hub/publish', { slug: skillSlug }, true, 200);
-    await test('Hub: Install', 'POST', '/api/hub/skills/' + skillSlug + '/install', {}, true, 200);
+    await test('Hub: List agents', 'GET', '/api/hub/agents', null, false, 200);
+    await test('Agents legacy hub route removed', 'GET', '/api/agents/hub', null, false, 404);
+    let skillListingId = null;
+    let skillRevisionId = null;
+    let agentListingId = null;
+    let agentRevisionId = null;
+    if (skillId) {
+        const listingRes = await request('POST', '/api/catalog/skills', {
+            assetId: skillId,
+            title: 'Catalog Test Skill',
+            summary: 'Catalog test summary',
+            description: 'Catalog test description',
+            visibility: 'public'
+        }, true);
+        recordResult('Catalog: Create skill listing', listingRes.status === 201, { status: listingRes.status, expect: 201 });
+        skillListingId = listingRes.data?.data?.id || null;
+        skillRevisionId = listingRes.data?.data?.currentRevision?.id || null;
+    } else {
+        recordResult('Catalog: Create skill listing', false, { error: 'No skillId available' });
+    }
+    if (skillListingId) {
+        const submitRes = await request('POST', `/api/catalog/skills/${skillListingId}/submit`, { revisionId: skillRevisionId }, true);
+        recordResult('Catalog: Submit skill listing', submitRes.status === 200, { status: submitRes.status, expect: 200 });
+        const reviewId = submitRes.data?.data?.reviews?.[0]?.id || null;
+        const moderateRes = reviewId
+            ? await request('PATCH', `/api/catalog/reviews/${reviewId}`, { decision: 'approved', publish: true }, true, false, adminToken)
+            : { status: 0 };
+        recordResult('Catalog: Approve skill listing', moderateRes.status === 200, { status: moderateRes.status, expect: 200 });
+    } else {
+        recordResult('Catalog: Submit skill listing', false, { error: 'No skill listing available' });
+    }
+
+    if (agentId) {
+        const listingRes = await request('POST', '/api/catalog/agents', {
+            assetId: agentId,
+            title: 'Catalog Test Agent',
+            summary: 'Catalog agent summary',
+            description: 'Catalog agent description',
+            visibility: 'public'
+        }, true);
+        recordResult('Catalog: Create agent listing', listingRes.status === 201, { status: listingRes.status, expect: 201 });
+        agentListingId = listingRes.data?.data?.id || null;
+        agentRevisionId = listingRes.data?.data?.currentRevision?.id || null;
+    } else {
+        recordResult('Catalog: Create agent listing', false, { error: 'No agentId available' });
+    }
+    if (agentListingId) {
+        const submitRes = await request('POST', `/api/catalog/agents/${agentListingId}/submit`, { revisionId: agentRevisionId }, true);
+        recordResult('Catalog: Submit agent listing', submitRes.status === 200, { status: submitRes.status, expect: 200 });
+        const reviewId = submitRes.data?.data?.reviews?.[0]?.id || null;
+        const moderateRes = reviewId
+            ? await request('PATCH', `/api/catalog/reviews/${reviewId}`, { decision: 'approved', publish: true }, true, false, adminToken)
+            : { status: 0 };
+        recordResult('Catalog: Approve agent listing', moderateRes.status === 200, { status: moderateRes.status, expect: 200 });
+    } else {
+        recordResult('Catalog: Submit agent listing', false, { error: 'No agent listing available' });
+    }
+
+    if (agentId) {
+        const publicAgentRes = await request('GET', `/api/hub/agents/${agentId}`, null, false);
+        const publicAgent = publicAgentRes.data?.data || {};
+        recordResult('Hub: Public agent detail sanitized', publicAgentRes.status === 200
+            && publicAgent.personalityProfile
+            && publicAgent.system_prompt === undefined
+            && publicAgent.behavior_rules === undefined
+            && publicAgent.sample_dialogues === undefined, {
+            status: publicAgentRes.status,
+            expect: 200
+        });
+        const resolveBeforeSubscribe = await request(
+            'GET',
+            `/api/catalog/entitlements/resolve?assetType=agent&assetId=${encodeURIComponent(agentId)}&action=chat`,
+            null,
+            true,
+            false,
+            consumerToken
+        );
+        recordResult('Catalog: Public agent requires grant for chat', resolveBeforeSubscribe.status === 200
+            && resolveBeforeSubscribe.data?.data?.allowed === false
+            && resolveBeforeSubscribe.data?.data?.reason === 'subscription_required', {
+            status: resolveBeforeSubscribe.status,
+            expect: 200
+        });
+        const subscribeRes = await request('POST', `/api/hub/agents/${agentId}/subscribe`, {}, true, false, consumerToken);
+        recordResult('Hub: Subscribe agent grant created', subscribeRes.status === 200, { status: subscribeRes.status, expect: 200 });
+        const resolveAfterSubscribe = await request(
+            'GET',
+            `/api/catalog/entitlements/resolve?assetType=agent&assetId=${encodeURIComponent(agentId)}&action=chat`,
+            null,
+            true,
+            false,
+            consumerToken
+        );
+        recordResult('Catalog: Agent entitlement resolves after subscribe', resolveAfterSubscribe.status === 200
+            && resolveAfterSubscribe.data?.data?.allowed === true
+            && !!resolveAfterSubscribe.data?.data?.grant
+            && (resolveAfterSubscribe.data?.data?.billingSubject?.type === 'user'), {
+            status: resolveAfterSubscribe.status,
+            expect: 200
+        });
+        const grantsRes = await request('GET', '/api/catalog/grants?scope=owned', null, true);
+        const ownedGrants = grantsRes.data?.data?.ownedGrants || [];
+        const agentGrant = ownedGrants.find((grant) => String(grant.asset_id) === String(agentId) && String(grant.subject_id) === String(consumerUserId));
+        recordResult('Catalog: Grant lineage exposed', grantsRes.status === 200
+            && !!agentGrant
+            && !!agentGrant.lineage
+            && !!agentGrant.billingSubject, {
+            status: grantsRes.status,
+            expect: 200
+        });
+        if (agentGrant?.id) {
+            const grantUsageRes = await request('GET', `/api/catalog/grants/${agentGrant.id}/usage`, null, true);
+            recordResult('Catalog: Grant usage endpoint', grantUsageRes.status === 200, { status: grantUsageRes.status, expect: 200 });
+        } else {
+            recordResult('Catalog: Grant usage endpoint', false, { error: 'No agent grant available' });
+        }
+        const assetUsageRes = await request('GET', `/api/catalog/assets/agent/${agentId}/usage-attribution`, null, true);
+        recordResult('Catalog: Asset usage attribution endpoint', assetUsageRes.status === 200, { status: assetUsageRes.status, expect: 200 });
+    }
+    if (skillId) {
+        const publicSkillRes = await request('GET', `/api/hub/skills/${skillSlug}`, null, false);
+        const publicSkill = publicSkillRes.data?.data || {};
+        recordResult('Hub: Public skill detail sanitized', publicSkillRes.status === 200
+            && publicSkill.instructions === undefined
+            && publicSkill.definition === undefined, {
+            status: publicSkillRes.status,
+            expect: 200
+        });
+        const resolveSkillBeforeInstall = await request(
+            'GET',
+            `/api/catalog/entitlements/resolve?assetType=skill&assetId=${encodeURIComponent(skillId)}&action=install`,
+            null,
+            true,
+            false,
+            consumerToken
+        );
+        recordResult('Catalog: Public skill requires grant for install', resolveSkillBeforeInstall.status === 200
+            && resolveSkillBeforeInstall.data?.data?.allowed === false
+            && resolveSkillBeforeInstall.data?.data?.reason === 'subscription_required', {
+            status: resolveSkillBeforeInstall.status,
+            expect: 200
+        });
+        const installRes = await request('POST', `/api/hub/skills/${skillSlug}/install`, {}, true, false, consumerToken);
+        recordResult('Hub: Install approved skill', installRes.status === 200, { status: installRes.status, expect: 200 });
+        const resolveSkillAfterInstall = await request(
+            'GET',
+            `/api/catalog/entitlements/resolve?assetType=skill&assetId=${encodeURIComponent(skillId)}&action=install`,
+            null,
+            true,
+            false,
+            consumerToken
+        );
+        recordResult('Catalog: Skill entitlement resolves after install grant', resolveSkillAfterInstall.status === 200
+            && resolveSkillAfterInstall.data?.data?.allowed === true
+            && !!resolveSkillAfterInstall.data?.data?.grant, {
+            status: resolveSkillAfterInstall.status,
+            expect: 200
+        });
+    }
 
     // 4.8 AI
     await test('AI: Status', 'GET', '/api/ai/status', null, true, 200);

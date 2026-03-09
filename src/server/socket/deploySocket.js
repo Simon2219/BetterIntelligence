@@ -2,6 +2,7 @@
  * Deploy namespace - Anonymous embed chat via /deploy/:slug
  */
 const deploymentChatService = require('../services/deploymentChatService');
+const catalogEntitlementService = require('../services/catalogEntitlementService');
 const notificationService = require('../services/notificationService');
 const log = require('../services/Logger')('deploy');
 
@@ -26,6 +27,19 @@ function initDeploySocket(io) {
         socket.agent = context.agent;
         socket.embedSessionId = socket.id;
 
+        const initialEntitlement = catalogEntitlementService.resolveDeploymentEntitlement({
+            deployment: context.dep
+        });
+        if (!initialEntitlement.allowed) {
+            socket.emit('agent:error', {
+                error: initialEntitlement.reason === 'quota_exhausted'
+                    ? 'Quota exceeded'
+                    : 'Deployment is not available for anonymous embed access'
+            });
+            socket.disconnect(true);
+            return;
+        }
+
         log.info('Embed connected', { slug, sessionId: socket.embedSessionId });
 
         socket.on('deploy:message', async (data) => {
@@ -46,6 +60,15 @@ function initDeploySocket(io) {
                     conversationId: data?.conversationId,
                     embedSessionId: socket.embedSessionId
                 });
+                const entitlement = catalogEntitlementService.resolveDeploymentEntitlement({
+                    deployment: resolved.dep
+                });
+                if (!entitlement.allowed) {
+                    socket.emit('agent:error', {
+                        error: entitlement.reason === 'quota_exhausted' ? 'Quota exceeded' : 'Deployment access denied'
+                    });
+                    return;
+                }
                 chatId = resolved.chat.id;
                 socket.join(`deploy:chat:${chatId}`);
                 if ((data?.conversationId || null) !== chatId) {
@@ -60,7 +83,8 @@ function initDeploySocket(io) {
                     embedSessionId: socket.embedSessionId,
                     message,
                     source: 'embed-socket',
-                    emitToEmbed: true
+                    emitToEmbed: true,
+                    catalogEntitlement: entitlement
                 });
             } catch (err) {
                 log.error('deploy:message error', { err: err.message });
@@ -85,4 +109,3 @@ function initDeploySocket(io) {
 }
 
 module.exports = { initDeploySocket };
-

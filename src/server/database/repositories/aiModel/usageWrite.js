@@ -22,7 +22,7 @@ function createUsageWriteApi({ run, upsertModel }) {
         const success = event.success === false ? 0 : 1;
         const metadata = JSON.stringify(event.metadata && typeof event.metadata === 'object' ? event.metadata : {});
 
-        run(`INSERT INTO ai_model_usage_events (
+        const result = run(`INSERT INTO ai_model_usage_events (
             provider_name, model_id, model_type, user_id, agent_id, chat_id, source, success,
             prompt_tokens, completion_tokens, total_tokens, duration_ms, metadata
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
@@ -40,7 +40,7 @@ function createUsageWriteApi({ run, upsertModel }) {
             durationMs,
             metadata
         ]);
-        return true;
+        return Number(result?.lastInsertRowid || 0) || null;
     }
 
     return {

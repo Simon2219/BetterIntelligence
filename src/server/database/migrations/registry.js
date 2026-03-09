@@ -23,7 +23,11 @@ const migrationModules = [
     require('./m022_chat_summary_message_count'),
     require('./m023_deployment_ownership_and_embed_acl'),
     require('./m024_refresh_token_families'),
-    require('./m025_drop_provider_api_key')
+    require('./m025_drop_provider_api_key'),
+    require('./m026_marketplace_foundation'),
+    require('./m027_catalog_db_first_cleanup'),
+    require('./m028_strict_catalog_cutover'),
+    require('./m029_unified_grants_usage_attribution')
 ];
 
 function listMigrations() {

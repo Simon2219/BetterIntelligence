@@ -1,10 +1,17 @@
+const PROMPT_TEMPLATES = [
+    { label: 'Helpful Assistant', prompt: 'You are a helpful, friendly assistant. Answer questions clearly and concisely. If you are unsure, say so.' },
+    { label: 'Code Expert', prompt: 'You are an expert software engineer. Provide clear, well-structured code with explanations. Follow best practices and suggest improvements when appropriate.' },
+    { label: 'Creative Writer', prompt: 'You are a creative writing assistant. Help with brainstorming, drafting, and refining prose, poetry, and dialogue. Offer vivid, imaginative suggestions.' },
+    { label: 'Customer Support', prompt: 'You are a professional customer support agent. Be empathetic, patient, and solution-oriented. Guide users step by step and escalate when you cannot resolve an issue.' }
+];
+
 export function renderPersonalityStep(content, context) {
     const {
         formData,
         escapeHtml,
-        markDirty,
-        promptTemplates
+        markDirty
     } = context;
+    const promptTemplates = PROMPT_TEMPLATES;
 
     const promptLength = (formData.systemPrompt || '').length;
     const stopTags = (formData.stopSequences || []).map((stop) => `<span class="tag-chip" data-value="${escapeHtml(stop)}">${escapeHtml(stop)} <button type="button" class="tag-chip__remove">&times;</button></span>`).join('');

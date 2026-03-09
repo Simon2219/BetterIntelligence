@@ -1,5 +1,5 @@
 const { authenticateSocket } = require('./socketAuth');
-const { AIAgentRepository, SubscriptionRepository, AnalyticsRepository } = require('../database');
+const { AIAgentRepository, AnalyticsRepository, RoleRepository } = require('../database');
 const analyticsService = require('../services/analyticsService');
 const socketSessionRegistry = require('../services/socketSessionRegistry');
 const log = require('../services/Logger')('analytics-socket');
@@ -18,8 +18,7 @@ function canAccessAgent(userId, agent) {
     if (!agent) return false;
     const owner = String(agent.user_id || '').trim().toUpperCase();
     const uid = String(userId || '').trim().toUpperCase();
-    if (owner && owner === uid) return true;
-    return SubscriptionRepository.isSubscribed(uid, agent.id);
+    return !!owner && owner === uid;
 }
 
 function analyticsRoom(userId, agentId) {
@@ -39,7 +38,10 @@ function initAnalyticsSocket(io) {
                 const agentId = normalizeAgentId(payload?.agentId);
                 if (!agentId) return;
                 const agent = AIAgentRepository.getById(agentId);
-                if (!canAccessAgent(socket.userId, agent)) {
+                const canAccess = canAccessAgent(socket.userId, agent)
+                    || RoleRepository.hasPermission(socket.user?.role, 'can_access_admin')
+                    || RoleRepository.hasPermission(socket.user?.role, 'can_manage_marketplace');
+                if (!canAccess) {
                     socket.emit('analytics:error', { error: 'Access denied', agentId });
                     return;
                 }

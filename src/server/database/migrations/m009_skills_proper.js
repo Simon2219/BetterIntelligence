@@ -5,6 +5,11 @@ const path = require('path');
 const Config = require('../../../../config/Config');
 const log = require('../../services/Logger')('db');
 
+function resolveCreatorId(userId) {
+    if (!userId) return null;
+    return get('SELECT id FROM users WHERE UPPER(id) = UPPER(?)', [String(userId).trim()])?.id || null;
+}
+
 function up() {
     run(`CREATE TABLE IF NOT EXISTS skills (
             id TEXT PRIMARY KEY,
@@ -73,9 +78,10 @@ function up() {
             for (const r of registry) {
                 const id = r.creator_id ? 'user:' + r.creator_id + ':' + r.slug : 'hub:' + r.slug;
                 if (get('SELECT id FROM skills WHERE id = ?', [id])) continue;
+                const creatorId = resolveCreatorId(r.creator_id);
                 run(`INSERT INTO skills (id, slug, path, creator_id, visibility, version, hub_published, name, description)
                     VALUES (?, ?, ?, ?, 'public', ?, 1, ?, '')`,
-                    [id, r.slug, r.path, r.creator_id || null, r.version || '1.0.0', r.slug]);
+                    [id, r.slug, r.path, creatorId, r.version || '1.0.0', r.slug]);
             }
         }
     
@@ -95,6 +101,7 @@ function up() {
                     if (!fs.existsSync(path.join(skillPath, 'SKILL.md'))) continue;
                     const id = prefix + uid + ':' + slug;
                     if (get('SELECT id FROM skills WHERE id = ?', [id])) continue;
+                    const creatorId = dirName === 'workspace' ? resolveCreatorId(uid) : null;
                     let name = slug, description = '', version = '1.0.0';
                     try {
                         const content = fs.readFileSync(path.join(skillPath, 'SKILL.md'), 'utf8');
@@ -112,7 +119,7 @@ function up() {
                     }
                     run(`INSERT INTO skills (id, slug, path, creator_id, visibility, version, hub_published, name, description)
                         VALUES (?, ?, ?, ?, 'private', ?, 0, ?, ?)`,
-                        [id, slug, dirName + '/' + uid + '/' + slug, dirName === 'workspace' ? uid : null, version, name, description]);
+                        [id, slug, dirName + '/' + uid + '/' + slug, creatorId, version, name, description]);
                 }
             }
         }

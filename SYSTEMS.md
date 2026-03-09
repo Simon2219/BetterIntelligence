@@ -1,141 +1,386 @@
 # BetterIntelligence - Canonical System Map
 
 ## 1) Runtime Architecture
+
 - Backend: Node.js + Express + Socket.io
-- Database: SQLite (`better-sqlite3`) through repository modules
-- Frontend: Vanilla JS SPA + modular views/components
-- AI: Provider registry (Ollama, ComfyUI, OpenAI-compatible), unified execution boundary
+- Database: SQLite via `better-sqlite3`
+- Frontend: Vanilla JS SPA with modular view and CSS architecture
+- AI execution: provider registry plus unified runtime pipeline
+
+### Primary runtime owners
+
+- Server entry: `server.js`
+- HTTPS launcher: `start-https.js`
+- Frontend composition root: `src/client/js/core/bootstrap.js`
+- Client routing: `src/client/js/core/router.js`
+- SPA assets: `src/client`
+- Embed entrypoint: `src/client/embed.html`
+
+### Static and socket serving
+
+- `/media` serves persisted media
+- `/lib/cropperjs` serves Cropper assets
+- `/embed/:slug` serves embed HTML
+- Socket namespaces:
+  - `/`
+  - `/deploy/<slug>`
+  - `/notifications`
+  - `/admin`
+  - `/analytics`
+
+---
 
 ## 2) Backend Boundaries
-### Entry + Wiring
-- `server.js`
-- Route registration under `/api/*`
-- Socket namespace initialization: `/`, `/deploy`, `/notifications`, `/admin`, `/analytics`
 
-### Database Layer (Canonical)
-- `src/server/database/index.js` exports repositories
-- Repositories live in `src/server/database/repositories/*Repository.js`
-- Core DB runtime helpers in `src/server/database/core/*`
-- Migrations in `src/server/database/migrations/*`
+### Route families and ownership
 
-Canonical naming rule:
-- Use `*Repository` exports (`UserRepository`, `ChatRepository`, `AIModelRepository`, etc.)
-- No new `*System` modules as primary ownership
-
-### AI Pipeline
-- Context: `src/server/ai/context/ContextBuilder.js`
-- Execution boundary: `src/server/ai/execution/AIExecution.js`
-- Usage tracking: `src/server/ai/usage/AIUsageTracker.js`
-- Provider runtime: `src/server/ai/providers/*`
-
-### Shared Services
-- Agent availability source-of-truth: `src/server/services/agentAvailabilityService.js`
-- Realtime fanout + in-memory notifications: `src/server/services/realtimeBus.js`
-- Model catalog orchestration: `src/server/services/aiModelCatalogService.js`
-- Appearance orchestration: `src/server/services/appearanceService.js`
-- Chat summarization: `src/server/services/chatSummaryService.js`
-
-## 3) API Surface (Primary)
-### Auth + Users
-- `/api/auth/*`
-- `/api/users/me`
-- `/api/users/me/password`
-- `/api/users/me/notifications` (REST bootstrap for topbar notifications)
-- `/api/users/me/notifications/:id/ack`
-
-### Agents + Hub
 - `/api/agents/*`
+  - agent CRUD
+  - categories, tags, private tags
+  - ACC aggregate via `/api/agents/dashboard`
+  - agent analytics support
+- `/api/catalog/*`
+  - creator publishing
+  - listings
+  - revisions
+  - reviews
+  - grants
+  - access requests
+  - entitlement resolution
+  - grant and asset attribution reporting
 - `/api/hub/*`
-
-Availability contract (additive):
-- `modelStatuses[]`
-- `modelStatus` aggregate
-- provider/model display-name fields
-
-### Chats
-- `/api/chats`
-- `/api/chats/deployments`
-- `/api/chats/unread-count`
-- `/api/chats/:chatId`
-- `/api/chats/:chatId/messages`
-- `/api/chats/:chatId/read`
-- `/api/chats/:chatId/summary`
-
-Chat payloads include canonical agent availability metadata via `agentAvailabilityService`.
-
-### Admin / Models / Appearance
-- `/api/admin/*`
-- `/api/appearance`
-- `/api/roles/*`
-
-### Skills / Knowledge / Analytics / Media / Deploy
+  - public discovery
+  - public agent detail
+  - public skill detail
+  - public subscribe/install entrypoints
 - `/api/skills/*`
-- `/api/knowledge/*`
-- `/api/analytics/*`
-- `/api/media/*`
+  - skill workspace CRUD
+  - installed skill inventory
+  - skill categories
 - `/api/deploy/*`
+  - deployment CRUD
+  - deployment members
+  - deployment access policy
+  - deployment stats
+  - embed/runtime chat entrypoints
+- Additional route families:
+  - `/api/auth/*`
+  - `/api/users/*`
+  - `/api/chats/*`
+  - `/api/analytics/*`
+  - `/api/admin/*`
+  - `/api/appearance/*`
+  - `/api/roles/*`
+  - `/api/knowledge/*`
+  - `/api/media/*`
+  - `/api/ai/*`
 
-## 4) Socket Namespaces (Realtime Overlay)
-### `/` (gateway)
-- Chat/agent streaming lifecycle (`chat:*`, `agent:*`)
+### Current service owners
 
-### `/deploy`
-- Embed + deployment channel
+- `src/server/services/catalogService.js`
+  - listing/revision/review orchestration
+- `src/server/services/catalogEntitlementService.js`
+  - runtime entitlement resolution
+  - grants
+  - quota enforcement
+  - usage attribution
+  - deployment runtime entitlement resolution
+- `src/server/services/accDashboardService.js`
+  - `/api/agents/dashboard` aggregate payload builder
+- `src/server/services/deploymentAclService.js`
+  - deployment operator/member authorization
+- `src/server/services/deploymentStatsService.js`
+  - deployment usage, cost, and operational summaries
+- `src/server/services/SkillMaterializationService.js`
+  - DB-to-filesystem skill materialization
+- `src/server/services/notificationService.js`
+  - realtime notification fanout
+- `src/server/ai/services/agentAvailabilityService.js`
+  - agent model/provider health hydration
 
-### `/notifications`
-- `notifications:subscribe`
-- `notifications:new`
-- `notifications:badge`
-- `notifications:ack`
+### Key public/backend interfaces
 
-### `/admin`
-- `admin:model_status:subscribe|unsubscribe`
-- `admin:model_status:update`
-- `admin:model_usage:update`
-- `admin:provider_status:update`
+- `/api/agents/dashboard`
+  - ACC aggregate payload
+- `/api/catalog/grants`
+  - grant reads and writes
+- `/api/catalog/entitlements/resolve`
+  - runtime entitlement resolution
+- `/api/hub/agents`
+  - public agent discovery
+- `/api/hub/skills`
+  - public skill discovery
 
-### `/analytics`
-- `analytics:subscribe|unsubscribe`
-- `analytics:snapshot`
-- `analytics:update`
+### Database and repository owners
 
-Rule:
-- REST is source of truth.
-- Sockets are realtime overlays.
+- `CatalogListingRepository`
+  - catalog listings
+  - revisions
+  - plan tiers
+  - bundle items
+  - reviews
+  - audit log
+- `CatalogEntitlementRepository`
+  - `catalog_grants`
+  - access requests
+  - usage counters
+- `SkillInstallationRepository`
+  - `skill_installations`
+- `UsageAttributionRepository`
+  - `usage_attribution_legs`
+- `DeploymentAccessPolicyRepository`
+  - deployment runtime access policy persistence
+- Still active deployment member persistence:
+  - `DeploymentMemberRepository`
 
-## 5) Frontend Architecture
-### App Shell
-- `src/client/js/app.js` (thin app entrypoint)
-- `src/client/js/core/bootstrap.js` (composition root: wiring, routing, lifecycle)
-- `src/client/js/core/socketClients.js` (shared namespace socket manager)
-- `src/client/js/core/clientAppearance.js`
+### Migrations currently shaping this architecture
 
-### Views
-- `src/client/js/views/chat/chatMainView.js`
-- `src/client/js/views/agents/agentsMainView.js`
-- `src/client/js/views/admin/adminPanelView.js`
+- `m026_marketplace_foundation`
+- `m027_catalog_db_first_cleanup`
+- `m028_strict_catalog_cutover`
+- `m029_unified_grants_usage_attribution`
+
+These migrations define the current catalog/grants system. `m026` still uses legacy `marketplace` naming because it is migration history, not current product vocabulary.
+
+---
+
+## 3) Persistence and Source of Truth
+
+### Agent source of truth
+
+- Editable agent source lives in `ai_agents`
+- Public/shared state comes from approved Catalog revisions
+- Hub public agents are sourced from approved, sanitized catalog-backed snapshots
+- Agent Builder is the editable route, not the public listing source
+
+### Skill source of truth
+
+- Skills are DB-canonical
+- Installed skills are persisted in `skill_installations`
+- Filesystem `SKILL.md` is materialized output only
+- Public Hub skill reads come from approved Catalog listings plus canonical skill rows
+
+### Deployment source of truth
+
+- Deployments live in deploy-owned tables and routes
+- Deployment runtime access policy is deploy-owned
+- Deployment sponsor grants support runtime sponsorship only
+
+### Catalog source of truth
+
+- Creator publishing, review, grants, and access requests live under Catalog
+- Public discovery does not come from ad hoc publish flags
+- Approved revision state is the public/shared contract
+
+---
+
+## 4) Frontend Boundaries
+
+### Route entry files
+
+- `src/client/js/views/agents/accMainView.js`
+- `src/client/js/views/agentBuilder/agentBuilderMainView.js`
+- `src/client/js/views/skills/skillsView.js`
+- `src/client/js/views/hub/hubView.js`
 - `src/client/js/views/deploy/deployMainView.js`
-- `src/client/js/views/analyticsView.js`
-- `src/client/js/views/*` (skills, hub, auth, settings, onboarding, app shell parts)
+- `src/client/js/views/admin/adminPanelView.js`
+- `src/client/js/views/chat/chatMainView.js`
+- `src/client/js/views/analytics/analyticsView.js`
 
-### Shared UI + Utilities
-- `src/client/js/components/*`
-- `src/client/js/utils/modelHealth.js`
-- `src/client/js/utils/dom.js`
-- `src/client/js/utils/dragdrop.js`
+### Route ownership
 
-### Styles
-- `src/client/styles/StyleManifest.css` (single app stylesheet entrypoint)
-- `src/client/styles/tokens/theme.css` (canonical token layer)
-- `src/client/styles/views/ChatView.css`
+- `/agents`
+  - Agent Control Center only
+- `/agents/:id/analytics`
+  - agent analytics only
+- `/agentBuilder`
+  - create/edit builder only
+- `/skills`
+  - workspace and installed inventory
+- `/hub`
+  - public discovery
+- `/deploy`
+  - deployment hub
+
+### ACC internal file family
+
+- `accMainView.js`
+- `accRender.js`
+- `accInteractions.js`
+- `accOverlays.js`
+- `accCharts.js`
+- `accCategoryManager.js`
+
+These files are the ACC route internals. They are not separate route owners.
+
+---
+
+## 5) Entitlements and Authorization
+
+### Grants
+
+Grants are entitlement contracts only.
+
+Current grant subjects:
+
+- `user`
+- `deployment`
+- `org`
+
+Grants govern:
+
+- runtime access
+- feature gates
+- quota limits
+- listing/plan lineage
+- billing subject linkage
+- runtime attribution lineage
+
+Current grant model supports:
+
+- direct grants
+- bundle-derived grants
+- deployment sponsor grants
+- deployment budget child grants
+- parent/child grant lineage
+- auto-roll to latest approved revision
+
+Current actor model:
+
+- owner
+- grant subject
+- billing subject
+- deployment runtime subject
+- collaborator/operator via ACL
+
+### Usage attribution
+
+`usage_attribution_legs` models one authoritative usage total plus mirrored attribution views.
+
+Key rule:
+
+- one runtime event has exactly one authoritative billable total
+- additional attribution legs exist for quota, reporting, owner-share, deployment-history, or skill-share views
+- totals must not double count
+
+### ACL
+
+ACL is separate from grants.
+
+ACL governs:
+
+- deployment member/admin/manager access
+- other collaborator/operator management permissions where implemented
+
+Grants do not grant human admin/operator rights.
+
+### Deployment sponsor grants
+
+Deployment sponsor grants are runtime sponsorship only.
+
+They do:
+
+- allow sponsored deployment runtime
+- carry quota/budget context
+- support deployment usage attribution
+
+They do not:
+
+- grant deployment member access
+- grant config access
+- grant chat moderation access
+- grant admin/operator rights
+
+Current deployment access policy modes:
+
+- `public_sponsored`
+- `authenticated_entitled`
+- `internal_only`
+
+---
 
 ## 6) Cross-System Contracts
-1. Agent availability must be server-derived (`agentAvailabilityService`) and reused in Agents/Chat/Hub payloads.
-2. Chat parent-group severity:
-- `warning` when at least one model unavailable
-- `error` when all models unavailable
-- `ok` when all available
-3. Chat composer behavior:
-- `error` => input/send/attach disabled
-- `warning` => send stays enabled
-4. Display names are UI labels only; technical identifiers remain provider/model keys.
+
+### Public discovery
+
+- Hub owns public discovery
+- Hub uses approved, sanitized Catalog-backed data only
+- Hub must not depend on private Agents or Skills workspace endpoints for public discovery behavior
+
+### Creator publishing
+
+- Catalog owns creator publishing and review
+- ACC consumes Catalog-backed state
+- Hub does not own creator publishing workflows
+
+### ACC
+
+- ACC is summary/control only
+- ACC may link into Hub, Skills, Deploy, and Agent Builder
+- ACC must not duplicate full workflows from those systems
+
+### Agent Builder
+
+- Agent Builder is the editable source for agents
+- It is not the public listing source
+- It is separate from ACC route ownership
+
+### Skills
+
+- Skills workspace owns skill authoring and installed inventory
+- Catalog owns public listing/review/grant state for skills
+
+### Deployments
+
+- Deployments are managed in `/deploy`
+- Deployment runtime access policy is deploy-owned
+- ACC may summarize deployment state but does not own deployment workflows
+
+---
+
+## 7) Validation and Invariants
+
+### Stable validation commands
+
+- `npm start`
+- `npm test`
+- `node scripts/run-api-tests.js https://localhost:3001`
+- `node --check <file>`
+
+### Architectural invariants
+
+- no `/api/market/*`
+- no `/api/agents/hub`
+- `/hub` owns public discovery
+- `/catalog` owns creator publishing and entitlement management
+- `/agents` is ACC only
+- `/agentBuilder` is the builder route family
+- skills are DB-canonical
+- grants and ACL remain separate systems
+
+### Compatibility identifiers intentionally retained
+
+These names still exist as compatibility/history artifacts and should not be treated as current product naming:
+
+- `can_manage_marketplace`
+- `can_moderate_marketplace`
+- `m026_marketplace_foundation`
+
+---
+
+## 8) Canonical Answer Rules
+
+Use this file as the answer to:
+
+- what exists right now
+- which route or subsystem owns which responsibility
+- what the current data and entitlement model is
+- which invariants must remain true
+
+Do not use this file for:
+
+- recent work narrative
+- handoff instructions for future agents
+- volatile validation pass-count history
+
+Those belong in `HANDOFF.md`.

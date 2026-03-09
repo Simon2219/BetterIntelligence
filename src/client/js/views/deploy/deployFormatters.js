@@ -27,6 +27,26 @@ export function formatDeployTime(iso) {
     return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+export function formatDeployAccessMode(mode) {
+    const normalized = String(mode || '').trim().toLowerCase();
+    if (normalized === 'public_sponsored') return 'Public Sponsored';
+    if (normalized === 'authenticated_entitled') return 'Authenticated';
+    return 'Internal Only';
+}
+
+export function summarizeDeployQuota(quota) {
+    const metrics = quota?.metrics || {};
+    const firstAlert = Object.entries(metrics).find(([, metric]) => Number(metric?.percentUsed || 0) >= 80);
+    if (firstAlert) {
+        const [metricKey, metric] = firstAlert;
+        return `${metricKey.replace(/^monthly_/, '').replace(/_/g, ' ')} ${Number(metric.percentUsed || 0)}%`;
+    }
+    const firstMetric = Object.entries(metrics)[0];
+    if (!firstMetric) return 'No quota';
+    const [, metric] = firstMetric;
+    return `${Number(metric.remaining || 0).toLocaleString()} left`;
+}
+
 export function renderDeployStatCard(label, value, escapeHtml) {
     return `
         <div class="deploy-stat-card card"><div class="deploy-stat-card__value">${escapeHtml(String(value))}</div><div class="deploy-stat-card__label">${escapeHtml(label)}</div></div>

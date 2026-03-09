@@ -22,6 +22,20 @@ function authenticate(req, res, next) {
     next();
 }
 
+function authenticateOptional(req, res, next) {
+    const token = extractToken(req);
+    if (!token) return next();
+
+    const payload = jwtService.verifyAccessToken(token);
+    if (!payload?.userId) return next();
+
+    const user = UserRepository.getWithRole(payload.userId);
+    if (!user || !user.is_active) return next();
+
+    req.user = user;
+    next();
+}
+
 function requirePermission(permission) {
     return (req, res, next) => {
         if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
@@ -36,6 +50,5 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ success: false, error: 'Admin required' });
 }
 
-module.exports = { authenticate, requirePermission, requireAdmin };
-
+module.exports = { authenticate, authenticateOptional, requirePermission, requireAdmin };
 

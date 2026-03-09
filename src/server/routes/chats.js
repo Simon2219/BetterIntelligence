@@ -14,6 +14,7 @@ const log = require('../services/Logger')('chat');
 const { generateThreadSummary, sanitizeSummary, shouldRegenerateSummary, MAX_THREAD_SUMMARY_CHARS, MIN_MESSAGES_BETWEEN_SUMMARIES, SHORT_THREAD_DYNAMIC_LIMIT } = require('../ai/services/contextSummaryService');
 const deploymentAclService = require('../services/deploymentAclService');
 const deploymentChatService = require('../services/deploymentChatService');
+const catalogEntitlementService = require('../services/catalogEntitlementService');
 const { hydrateAgentModelAvailability, serializeAgentWithAvailability } = require('../ai/services/agentAvailabilityService');
 const { safeErrorMessage } = require('../utils/httpErrors');
 const { isSameUser, parseBoolean } = require('../utils/helperFunctions');
@@ -176,13 +177,29 @@ router.post('/', authenticate, (req, res) => {
         if (!agentId) return res.status(400).json({ success: false, error: 'agentId required' });
         const agent = AIAgentRepository.getById(agentId);
         if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
+        const entitlement = catalogEntitlementService.assertUserCanAccessAsset({
+            userId: req.user.id,
+            assetType: 'agent',
+            assetId: agentId,
+            action: 'chat'
+        });
         const chat = forceNew
             ? ChatRepository.create(req.user.id, agentId, { isAiChat: true, aiAgentId: agentId })
             : ChatRepository.getOrCreate(req.user.id, agentId);
-        res.json({ success: true, data: chat });
+        res.json({
+            success: true,
+            data: {
+                ...chat,
+                entitlement: {
+                    source: entitlement.source,
+                    featureGates: entitlement.featureGates,
+                    quota: entitlement.quota
+                }
+            }
+        });
     } catch (err) {
         log.error('Create error', { err: err.message });
-        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 

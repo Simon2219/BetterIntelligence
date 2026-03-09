@@ -24,7 +24,8 @@ import { icon, escapeHtml } from '../utils/dom.js';
 
 // View factories for each routed domain.
 import { createAuthView } from '../views/auth/authView.js';
-import { createAgentsView } from '../views/agents/agentsMainView.js';
+import { createAccView } from '../views/agents/accMainView.js';
+import { createAgentBuilderView } from '../views/agentBuilder/agentBuilderMainView.js';
 import { createChatView } from '../views/chat/chatMainView.js';
 import { createAnalyticsView } from '../views/analytics/analyticsView.js';
 import { createSkillsView } from '../views/skills/skillsView.js';
@@ -283,8 +284,23 @@ const { renderAuth } = createAuthView({
     escapeHtml
 });
 
-// Agents list and builder rendering functions.
-const { renderAgents, renderAgentForm } = createAgentsView({
+// ACC rendering function.
+const { renderAcc } = createAccView({
+    api,
+    navigate: navigateProxy,
+    showToast,
+    showConfirm,
+    getAgentAvatarUrl,
+    escapeHtml,
+    getCurrentUser,
+    setCurrentUser,
+    getToken,
+    API_BASE,
+    makeDropZone
+});
+
+// Agent Builder rendering function.
+const { renderAgentBuilder } = createAgentBuilderView({
     api,
     navigate: navigateProxy,
     showToast,
@@ -436,8 +452,8 @@ const routerController = createRouterController({
     viewRenderers: {
         renderLandingView,
         renderAuth,
-        renderAgents,
-        renderAgentForm,
+        renderAcc,
+        renderAgentBuilder,
         renderChatHub,
         renderChatView,
         renderAnalytics,

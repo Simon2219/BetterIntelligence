@@ -113,6 +113,13 @@
     flex-wrap: wrap;
 }
 
+.admin-catalog-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
 @media (max-width: 47.5em) {
     .admin-main-nav {
         gap: 0.4rem;

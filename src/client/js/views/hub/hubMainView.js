@@ -9,12 +9,10 @@ export async function renderHubMainView({
     rerender
 }) {
     try {
-        const [{ data: skills }, { data: agents }, { data: mySkills }] = await Promise.all([
+        const [{ data: skills }, { data: agents }] = await Promise.all([
             api('/hub/skills'),
-            api('/agents/hub'),
-            api('/skills')
+            api('/hub/agents')
         ]);
-        const installed = new Set((mySkills || []).filter((skill) => skill.source === 'installed').map((skill) => skill.slug || skill.name));
         const featuredSkills = (skills || []).slice(0, 3);
         const featuredAgents = (agents || []).slice(0, 4);
         const newSkills = (skills || []).slice(0, 6);
@@ -38,7 +36,7 @@ export async function renderHubMainView({
                                     <div class="card-title">${escapeHtml(skill.name)}</div>
                                     <div class="card-meta hub-card-meta--sm">${escapeHtml((skill.description || '').slice(0, 80))}${(skill.description || '').length > 80 ? '...' : ''}</div>
                                     <div class="card-actions">
-                                        ${installed.has(skill.slug || skill.name) ? '<span class="badge badge-ghost">Installed</span>' : `<button class="btn btn-primary btn-sm btn-install" data-slug="${skill.slug || skill.name}">Install</button>`}
+                                        ${skill.isInstalled ? '<span class="badge badge-ghost">Installed</span>' : `<button class="btn btn-primary btn-sm btn-install" data-slug="${skill.slug || skill.name}">Install</button>`}
                                     </div>
                                 </div>
                             `).join('')}
@@ -76,7 +74,7 @@ export async function renderHubMainView({
                                 <div class="card-title">${escapeHtml(skill.name)}</div>
                                 <div class="card-meta">${escapeHtml((skill.description || '').slice(0, 100))}</div>
                                 <div class="card-actions">
-                                    ${installed.has(skill.slug || skill.name) ? '<span class="badge badge-ghost">Installed</span>' : `<button class="btn btn-primary btn-sm btn-install" data-slug="${skill.slug || skill.name}">Install</button>`}
+                                    ${skill.isInstalled ? '<span class="badge badge-ghost">Installed</span>' : `<button class="btn btn-primary btn-sm btn-install" data-slug="${skill.slug || skill.name}">Install</button>`}
                                 </div>
                             </div>
                         `).join('')}

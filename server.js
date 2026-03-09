@@ -37,6 +37,7 @@ const appearanceRoutes = require('./src/server/routes/appearance');
 const mediaRoutes = require('./src/server/routes/media');
 const rolesRoutes = require('./src/server/routes/roles');
 const privateTagsRoutes = require('./src/server/routes/privateTags');
+const catalogRoutes = require('./src/server/routes/catalog');
 const { initGatewaySocket } = require('./src/server/socket/gatewaySocket');
 const { initDeploySocket } = require('./src/server/socket/deploySocket');
 const { initNotificationsSocket } = require('./src/server/socket/notificationsSocket');
@@ -120,6 +121,7 @@ app.use('/api/appearance', appearanceRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/user/private-tags', privateTagsRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/catalog', catalogRoutes);
 
 // ─── Static & SPA ────────────────────────────────────────────────────────────
 

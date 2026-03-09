@@ -8,6 +8,7 @@ const {
 const MainAIManager = require('../ai/MainAIManager');
 const HooksService = require('./HooksService');
 const notificationService = require('./notificationService');
+const catalogEntitlementService = require('./catalogEntitlementService');
 const { createHttpError } = require('../utils/httpErrors');
 
 function emitToEmbedRoom(slug, chatId, eventName, payload) {
@@ -34,7 +35,7 @@ function loadDeploymentContextBySlug(slug, opts = {}) {
     if (!dep) throw createHttpError(404, 'Deployment not found');
     if (requireEmbedEnabled && !dep.embed_enabled) throw createHttpError(403, 'Embed not enabled');
 
-    const agent = AIAgentRepository.getById(dep.agent_id);
+    const agent = catalogEntitlementService.getDeploymentRuntimeAgent(dep) || AIAgentRepository.getById(dep.agent_id);
     if (!agent || (requireAgentActive && !agent.is_active)) {
         throw createHttpError(404, 'Agent not found');
     }
@@ -50,7 +51,7 @@ function loadDeploymentContextByChatId(chatId) {
     const dep = DeploymentRepository.getById(chat.deployment_id);
     if (!dep) throw createHttpError(404, 'Deployment not found');
 
-    const agent = AIAgentRepository.getById(dep.agent_id);
+    const agent = catalogEntitlementService.getDeploymentRuntimeAgent(dep) || AIAgentRepository.getById(dep.agent_id);
     if (!agent) throw createHttpError(404, 'Agent not found');
 
     return { chat, dep, agent };
@@ -81,10 +82,18 @@ function resolveOrCreateEmbedConversation({ slug, conversationId, embedSessionId
     return { dep, agent, chat };
 }
 
-async function runAIPipeline({ dep, agent, chat, prompt, usageSource, assistantMetadata = {}, emitToEmbed = true }) {
+async function runAIPipeline({ dep, agent, chat, prompt, usageSource, assistantMetadata = {}, emitToEmbed = true, catalogEntitlement = null }) {
     const resultMessageIds = [];
     const safePrompt = String(prompt || '').trim();
-    const usageContext = { source: usageSource || 'embed', agentId: agent.id, chatId: chat.id };
+    const usageContext = {
+        source: usageSource || 'embed',
+        agentId: agent.id,
+        chatId: chat.id,
+        metadata: catalogEntitlementService.buildUsageMetadata(catalogEntitlement, {
+            deploymentId: dep.id,
+            chatId: chat.id
+        })
+    };
     const invokeStart = Date.now();
 
     let result;
@@ -163,7 +172,7 @@ async function runAIPipeline({ dep, agent, chat, prompt, usageSource, assistantM
     return { text: displayText, media: result.media || [], messageIds: resultMessageIds, status: 'ok', aiMetadata: result.aiMetadata };
 }
 
-async function handleEmbedUserMessage({ dep, agent, chat, embedSessionId, message, source = 'embed-rest', emitToEmbed = true }) {
+async function handleEmbedUserMessage({ dep, agent, chat, embedSessionId, message, source = 'embed-rest', emitToEmbed = true, catalogEntitlement = null }) {
     const safeMessage = String(message || '').trim();
     if (!safeMessage) throw createHttpError(400, 'message required');
     if (safeMessage.length > 10000) throw createHttpError(400, 'Message too long (max 10,000 characters)');
@@ -195,7 +204,8 @@ async function handleEmbedUserMessage({ dep, agent, chat, embedSessionId, messag
         chat,
         prompt: safeMessage,
         usageSource: source,
-        emitToEmbed
+        emitToEmbed,
+        catalogEntitlement
     });
 
     HooksService.fire('agent_response', {
@@ -318,4 +328,3 @@ module.exports = {
     handleEmbedUserMessage,
     sendOperatorReply
 };
-

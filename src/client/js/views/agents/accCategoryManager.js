@@ -1,4 +1,4 @@
-export async function renderAgentsCategoryManager({
+export async function renderAccCategoryManager({
     container,
     categories = [],
     api,
@@ -28,54 +28,79 @@ export async function renderAgentsCategoryManager({
         </div>
     `;
 
-    const bindAgentCategoryHandlers = () => {
-        content.querySelectorAll('.category-name-edit').forEach((input) => {
-            input.replaceWith(input.cloneNode(true));
-        });
-        content.querySelectorAll('.category-name-edit').forEach((input) => {
-            input.addEventListener('change', async () => {
-                const name = input.value.trim();
-                if (!name) return;
-                try {
-                    await api(`/agents/categories/${input.dataset.id}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ name })
-                    });
-                    const found = order.find((item) => item.id === input.dataset.id);
-                    if (found) found.name = name;
-                    showToast('Category renamed', 'success');
-                } catch (error) {
-                    showToast(error.message, 'error');
-                }
-            });
-        });
+    const list = content.querySelector('#agent-category-list');
 
-        content.querySelectorAll('.btn-delete-cat').forEach((button) => {
-            button.replaceWith(button.cloneNode(true));
-        });
-        content.querySelectorAll('.btn-delete-cat').forEach((button) => {
-            button.addEventListener('click', async () => {
-                const ok = await showConfirm({
-                    title: 'Delete Category',
-                    message: 'Remove this category? Agents will become uncategorized.',
-                    confirmText: 'Delete',
-                    danger: true
-                });
-                if (!ok) return;
-                try {
-                    await api(`/agents/categories/${button.dataset.id}`, { method: 'DELETE' });
-                    order = order.filter((item) => item.id !== button.dataset.id);
-                    refreshList();
-                    showToast('Category deleted', 'success');
-                } catch (error) {
-                    showToast(error.message, 'error');
-                }
+    list.addEventListener('change', async (event) => {
+        const input = event.target.closest('.category-name-edit');
+        if (!input) return;
+        const name = input.value.trim();
+        if (!name) return;
+        try {
+            await api(`/agents/categories/${input.dataset.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name })
             });
+            const found = order.find((item) => item.id === input.dataset.id);
+            if (found) found.name = name;
+            showToast('Category renamed', 'success');
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    });
+
+    list.addEventListener('click', async (event) => {
+        const button = event.target.closest('.btn-delete-cat');
+        if (!button) return;
+        const ok = await showConfirm({
+            title: 'Delete Category',
+            message: 'Remove this category? Agents will become uncategorized.',
+            confirmText: 'Delete',
+            danger: true
         });
-    };
+        if (!ok) return;
+        try {
+            await api(`/agents/categories/${button.dataset.id}`, { method: 'DELETE' });
+            order = order.filter((item) => item.id !== button.dataset.id);
+            refreshList();
+            showToast('Category deleted', 'success');
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    });
+
+    list.addEventListener('dragstart', (event) => {
+        const row = event.target.closest('.category-dnd-item');
+        if (!row) return;
+        event.dataTransfer.setData('text', row.dataset.id);
+        row.classList.add('category-dragging');
+    });
+
+    list.addEventListener('dragend', (event) => {
+        const row = event.target.closest('.category-dnd-item');
+        if (row) row.classList.remove('category-dragging');
+    });
+
+    list.addEventListener('dragover', (event) => {
+        if (event.target.closest('.category-dnd-item')) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+        }
+    });
+
+    list.addEventListener('drop', (event) => {
+        const row = event.target.closest('.category-dnd-item');
+        if (!row) return;
+        event.preventDefault();
+        const id = event.dataTransfer.getData('text');
+        const fromIndex = order.findIndex((item) => item.id === id);
+        const toIndex = order.findIndex((item) => item.id === row.dataset.id);
+        if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+        const [removed] = order.splice(fromIndex, 1);
+        order.splice(toIndex, 0, removed);
+        refreshList();
+    });
 
     const refreshList = () => {
-        const list = content.querySelector('#agent-category-list');
         list.innerHTML = order.length
             ? order.map((category) => `
                 <div class="category-dnd-item" data-id="${category.id}" draggable="true">
@@ -86,31 +111,6 @@ export async function renderAgentsCategoryManager({
                 </div>
             `).join('')
             : '<p class="text-muted agent-category-manager__empty">No categories. Add one below.</p>';
-
-        list.querySelectorAll('.category-dnd-item').forEach((row) => {
-            row.addEventListener('dragstart', (event) => {
-                event.dataTransfer.setData('text', row.dataset.id);
-                row.classList.add('category-dragging');
-            });
-            row.addEventListener('dragend', () => row.classList.remove('category-dragging'));
-            row.addEventListener('dragover', (event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'move';
-            });
-            row.addEventListener('drop', (event) => {
-                event.preventDefault();
-                const id = event.dataTransfer.getData('text');
-                const fromIndex = order.findIndex((item) => item.id === id);
-                const toIndex = order.findIndex((item) => item.id === row.dataset.id);
-                if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
-                const [removed] = order.splice(fromIndex, 1);
-                order.splice(toIndex, 0, removed);
-                refreshList();
-                bindAgentCategoryHandlers();
-            });
-        });
-
-        bindAgentCategoryHandlers();
     };
 
     const modal = document.createElement('div');
@@ -127,7 +127,8 @@ export async function renderAgentsCategoryManager({
                 })
             });
         } catch (error) {
-            console.debug('Failed to persist agent category order', error);
+            showToast('Failed to save category order', 'error');
+            console.warn('Failed to persist agent category order', error);
         }
     };
 

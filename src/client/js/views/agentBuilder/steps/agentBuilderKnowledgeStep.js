@@ -41,6 +41,7 @@ export function renderKnowledgeStep(content, context) {
     async function loadDocs() {
         try {
             const { data: docs } = await api(`/knowledge/${agentId}/documents`);
+            if (!content.isConnected) return;
             if (!docs.length) {
                 docsListEl.innerHTML = '<p class="text-muted knowledge-docs-empty">No documents yet.</p>';
                 return;
@@ -52,7 +53,7 @@ export function renderKnowledgeStep(content, context) {
                     <div class="knowledge-doc-item">
                         <div class="knowledge-doc-item__info">
                             <strong>${escapeHtml(doc.title)}</strong>
-                            <span class="text-muted">${doc.chunk_count} chunks, ~${(doc.token_count / 1000).toFixed(1)}k tokens</span>
+                            <span class="text-muted">${(doc.chunk_count || 0)} chunks, ~${((doc.token_count || 0) / 1000).toFixed(1)}k tokens</span>
                         </div>
                         <button type="button" class="btn btn-ghost btn-sm kb-delete" data-id="${doc.id}">&times;</button>
                     </div>

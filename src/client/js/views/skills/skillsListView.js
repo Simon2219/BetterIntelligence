@@ -143,8 +143,34 @@ export async function renderSkillsListView({
         container.querySelectorAll('.btn-publish').forEach((button) => {
             button.addEventListener('click', async () => {
                 try {
-                    await api('/hub/publish', { method: 'POST', body: JSON.stringify({ slug: button.dataset.slug }) });
-                    showToast('Published to Hub', 'success');
+                    const skill = mine.find((item) => item.id === button.dataset.skillId || item.slug === button.dataset.slug);
+                    if (!skill) throw new Error('Skill not found');
+                    let listingId = skill.market?.listingId || null;
+                    if (!listingId) {
+                        const created = await api('/catalog/skills', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                assetId: skill.skillId || skill.id,
+                                title: skill.name,
+                                summary: skill.description || '',
+                                description: skill.description || '',
+                                visibility: skill.visibility === 'public' ? 'public' : 'private'
+                            })
+                        });
+                        listingId = created?.data?.id || created?.data?.listingId || null;
+                    } else {
+                        await api(`/catalog/skills/${encodeURIComponent(listingId)}/revisions`, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                title: skill.name,
+                                summary: skill.description || '',
+                                description: skill.description || ''
+                            })
+                        });
+                    }
+                    await api(`/catalog/skills/${encodeURIComponent(listingId)}/submit`, { method: 'POST', body: JSON.stringify({}) });
+                    showToast('Listing created and submitted for review', 'success');
+                    await rerender(path);
                 } catch (error) {
                     showToast(error.message, 'error');
                 }

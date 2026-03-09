@@ -10,7 +10,7 @@ export function skillCardHtml(skill, escapeHtml, showActions = false, categories
             <div class="card-actions">
                 <span class="badge badge-ghost skill-visibility-badge">${(skill.visibility || 'private')}</span>
                 <a href="#" class="btn btn-primary btn-sm" data-route="/skills/${encodeURIComponent(skill.id || skill.slug || skill.name)}/edit">Edit</a>
-                <button class="btn btn-ghost btn-sm btn-publish" data-slug="${skill.slug || skill.name}">Publish</button>
+                ${skill.source === 'workspace' ? `<button class="btn btn-ghost btn-sm btn-publish" data-skill-id="${skill.id}" data-slug="${skill.slug || skill.name}">${skill.market?.listingId ? 'Submit Revision' : 'Create Listing'}</button>` : ''}
             </div>
             ` : '<div class="card-actions"></div>'}
         </div>

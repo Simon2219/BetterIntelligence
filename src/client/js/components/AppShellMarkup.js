@@ -47,6 +47,10 @@ export function buildSidebarHtml({ path, canAccessAdmin }) {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
                     Agents
                 </a>
+                <a href="#" class="sidebar__link ${isActiveRoute(path, '/agentBuilder') ? 'sidebar__link--active' : ''}" data-route="/agentBuilder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    Agent Builder
+                </a>
                 <a href="#" class="sidebar__link ${isActiveRoute(path, '/skills') ? 'sidebar__link--active' : ''}" data-route="/skills">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                     Skills

@@ -1,3 +1,81 @@
+function getCatalogTone(status) {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (normalized === 'published' || normalized === 'approved') return 'success';
+    if (normalized === 'pending_review') return 'warning';
+    if (normalized === 'rejected' || normalized === 'suspended') return 'danger';
+    return 'ghost';
+}
+
+function renderCatalogBadge(label, value) {
+    if (!value) return '';
+    const tone = getCatalogTone(value);
+    return `<span class="badge badge-${tone}">${label}: ${value.replace(/_/g, ' ')}</span>`;
+}
+
+function getLatestReview(listing) {
+    const reviews = Array.isArray(listing?.reviews) ? [...listing.reviews] : [];
+    reviews.sort((left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime());
+    return reviews[0] || null;
+}
+
+function renderCatalogPanel({
+    agent,
+    formData,
+    catalogListing,
+    catalogBusy,
+    hasUnsavedChanges,
+    listingsRoute,
+    reviewsRoute,
+    escapeHtml
+}) {
+    if (!agent) return '';
+    const latestReview = getLatestReview(catalogListing);
+    const reviewStatus = catalogListing?.currentRevision?.review_status || catalogListing?.approvedRevision?.review_status || '';
+    const reviewNote = latestReview?.reason || catalogListing?.currentRevision?.submit_notes || '';
+    const driftDetected = !!catalogListing?.driftDetected;
+    const listingStatus = catalogListing?.status || 'not_created';
+    const statusLine = catalogListing
+        ? `${renderCatalogBadge('Listing', listingStatus)} ${renderCatalogBadge('Review', reviewStatus || 'draft')}`
+        : '<span class="badge badge-ghost">Listing: not created</span>';
+    const guidance = !catalogListing
+        ? 'Create a public catalog listing from this saved agent, then submit it for review.'
+        : driftDetected
+            ? 'The saved agent has changed since the current catalog draft. Update the listing draft before submitting.'
+            : hasUnsavedChanges
+                ? 'You have unsaved builder changes. Save the agent before refreshing the listing draft.'
+                : reviewStatus === 'pending_review'
+                    ? 'This listing is already pending review.'
+                    : 'The catalog draft is in sync with the latest saved agent.';
+
+    return `
+        <div class="review-catalog-panel">
+            <div class="review-catalog-panel__header">
+                <div>
+                    <div class="review-catalog-panel__title">Catalog Publishing</div>
+                    <p class="review-catalog-panel__desc">${escapeHtml(guidance)}</p>
+                </div>
+                ${catalogBusy ? '<span class="badge badge-ghost">Working...</span>' : ''}
+            </div>
+            <div class="review-catalog-panel__status">${statusLine}</div>
+            ${reviewNote ? `<div class="review-catalog-panel__note"><span class="review-card__label">Latest review note</span><p>${escapeHtml(reviewNote)}</p></div>` : ''}
+            <div class="review-catalog-panel__actions">
+                ${!catalogListing ? `<button type="button" class="btn btn-primary" id="builder-create-listing" ${catalogBusy ? 'disabled' : ''}>Create Listing</button>` : ''}
+                ${catalogListing ? `<button type="button" class="btn btn-ghost" id="builder-update-listing" ${catalogBusy ? 'disabled' : ''}>Update Listing</button>` : ''}
+                ${catalogListing ? `<button type="button" class="btn btn-primary" id="builder-submit-listing" ${catalogBusy || reviewStatus === 'pending_review' ? 'disabled' : ''}>Submit for Review</button>` : ''}
+                <a href="#" class="btn btn-ghost" data-route="${escapeHtml(listingsRoute)}">Open Listings</a>
+                <a href="#" class="btn btn-ghost" data-route="${escapeHtml(reviewsRoute)}">Open Reviews</a>
+            </div>
+            ${catalogListing ? `
+                <div class="review-catalog-panel__meta">
+                    <span>Visibility: ${escapeHtml(catalogListing.visibility || 'private')}</span>
+                    <span>Revision: #${catalogListing.currentRevision?.revision_number || catalogListing.approvedRevision?.revision_number || 1}</span>
+                    <span>${driftDetected ? 'Draft update recommended' : 'Draft is current'}</span>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
 export function renderReviewStep(content, context) {
     const {
         formData,
@@ -7,7 +85,15 @@ export function renderReviewStep(content, context) {
         sampleDialogues,
         getAgentAvatarUrl,
         escapeHtml,
-        navigate
+        navigate,
+        catalogListing,
+        catalogBusy,
+        hasUnsavedChanges,
+        listingsRoute,
+        reviewsRoute,
+        onCreateListing,
+        onUpdateListing,
+        onSubmitListing
     } = context;
 
     const name = formData.name || 'Agent';
@@ -86,27 +172,30 @@ export function renderReviewStep(content, context) {
                                 `;
                             })()}
                         </svg>
-                        <span class="review-capability-radar__label">Skills &bull; Rules &bull; Dialogues &bull; Prompt &bull; Flexibility</span>
+                        <span class="review-capability-radar__label">Skills | Rules | Dialogues | Prompt | Flexibility</span>
                     </div>
                 </div>
             </div>
             <div class="review-card__prompt">
                 <span class="review-card__label">System Prompt</span>
                 <p class="review-card__prompt-text">${escapeHtml(promptPreview)}</p>
-                <span class="text-muted u-text-xs">${promptLength} chars &middot; ~${Math.ceil(promptLength / 4)} tokens estimated</span>
+                <span class="text-muted u-text-xs">${promptLength} chars | ~${Math.ceil(promptLength / 4)} tokens estimated</span>
             </div>
             ${formData.greetingMessage ? `<div class="review-card__prompt"><span class="review-card__label">Greeting</span><p class="review-card__prompt-text">${escapeHtml(formData.greetingMessage)}</p></div>` : ''}
-            ${agent ? `
-            <div class="agent-review-actions">
-                <input type="checkbox" id="hub-publish" ${formData.hubPublished ? 'checked' : ''}>
-                <label for="hub-publish">Publish to Bot Hub (others can subscribe)</label>
-            </div>
-            ` : ''}
+            ${renderCatalogPanel({ agent, formData, catalogListing, catalogBusy, hasUnsavedChanges, listingsRoute, reviewsRoute, escapeHtml })}
         </div>
     `;
 
-    content.querySelector('#hub-publish')?.addEventListener('change', (event) => {
-        formData.hubPublished = event.target.checked;
+    content.querySelector('#builder-create-listing')?.addEventListener('click', async () => {
+        await onCreateListing?.();
+    });
+
+    content.querySelector('#builder-update-listing')?.addEventListener('click', async () => {
+        await onUpdateListing?.();
+    });
+
+    content.querySelector('#builder-submit-listing')?.addEventListener('click', async () => {
+        await onSubmitListing?.();
     });
 
     content.querySelectorAll('[data-route]').forEach((element) => {

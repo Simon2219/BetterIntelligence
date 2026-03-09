@@ -27,6 +27,7 @@ const SETTINGS_ALLOWLIST = new Set([
     'ai.temperature',
     'ai.maxTokens',
     'ai.historyMessagesLimit',
+    'billing.provider',
     'rateLimit.windowMs',
     'rateLimit.maxRequests'
 ]);

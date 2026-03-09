@@ -59,7 +59,7 @@ function createCategoryRepository(categoryTable, assignmentTable, entityColumn) 
 }
 
 const agentRepo = createCategoryRepository('agent_categories', 'agent_category_assignments', 'agent_id');
-const skillRepo = createCategoryRepository('skill_categories', 'skill_category_assignments', 'skill_id');
+const skillRepo = createCategoryRepository('skill_categories', 'skill_library_category_assignments', 'entry_id');
 
 const AgentCategoryRepository = {
     ...agentRepo,

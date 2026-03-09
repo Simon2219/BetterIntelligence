@@ -9,8 +9,8 @@ export function createRouterController({
     const {
         renderLandingView,
         renderAuth,
-        renderAgents,
-        renderAgentForm,
+        renderAcc,
+        renderAgentBuilder,
         renderChatHub,
         renderChatView,
         renderAnalytics,
@@ -97,18 +97,20 @@ export function createRouterController({
             const pathParts = pathname.split('/').filter(Boolean);
             const chatId = pathParts[0] === 'chat' && pathParts[1] ? pathParts[1] : null;
             await renderChatHub(main, chatId);
-        } else if (path === '/agents' || path.startsWith('/agents')) {
+        } else if (path === '/agentBuilder' || path.startsWith('/agentBuilder/') || path.startsWith('/agentBuilder?')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
-            if (path === '/agents/hub' || path.match(/^\/agents\/hub\/[^/]+$/)) {
-                const id = path.split('/').pop();
-                navigate(id && id !== 'hub' ? `/hub/agents/${id}` : '/hub/agents');
+            state.setCurrentView('agentBuilder');
+            await renderAgentBuilder(main, path);
+        } else if (path === '/agents' || path.startsWith('/agents?')) {
+            if (!state.getCurrentUser()) {
+                navigate('/login');
                 return;
             }
             state.setCurrentView('agents');
-            await renderAgents(main, path);
+            await renderAcc(main, path);
         } else if (path === '/skills' || path.startsWith('/skills')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');

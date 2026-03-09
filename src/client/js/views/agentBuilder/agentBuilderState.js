@@ -35,7 +35,7 @@ export function createAgentBuilderState(agent) {
     let allowedTopics = agent?.behavior_rules?.allowedTopics || [];
     let blockedTopics = agent?.behavior_rules?.blockedTopics || [];
     let sampleDialogues = Array.isArray(agent?.sample_dialogues) ? [...agent.sample_dialogues] : [];
-    const configuredModelStatuses = Array.isArray(agent?.modelStatuses) ? agent.modelStatuses : [];
+    let configuredModelStatuses = Array.isArray(agent?.modelStatuses) ? agent.modelStatuses : [];
 
     let formData = {
         name: agent?.name || '',
@@ -70,8 +70,7 @@ export function createAgentBuilderState(agent) {
         roleplayMode: agent?.metadata?.roleplayMode || 'assistant',
         responseDelayMin: agent?.metadata?.responseDelayMin ?? 0,
         responseDelayMax: agent?.metadata?.responseDelayMax ?? 0,
-        profanityFilter: agent?.metadata?.profanityFilter || 'allow',
-        hubPublished: agent?.hub_published === 1,
+        profanityFilter: agent?.metadata?.profanityFilter || 'allow'
     };
 
     let dirty = false;
@@ -94,6 +93,7 @@ export function createAgentBuilderState(agent) {
         get sampleDialogues() { return sampleDialogues; },
         set sampleDialogues(v) { sampleDialogues = v; },
         get configuredModelStatuses() { return configuredModelStatuses; },
+        set configuredModelStatuses(v) { configuredModelStatuses = Array.isArray(v) ? v : []; },
         get dirty() { return dirty; },
         markDirty() { dirty = true; },
         clearDirty() { dirty = false; },

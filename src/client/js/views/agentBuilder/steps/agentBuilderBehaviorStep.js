@@ -237,10 +237,13 @@ export function renderBehaviorStep(content, context) {
             chip.dataset.value = value.trim();
             chip.innerHTML = `${escapeHtml(value.trim())} <button type="button" class="tag-chip__remove">&times;</button>`;
             chip.querySelector('.tag-chip__remove').addEventListener('click', () => {
-                const idx = arr.indexOf(chip.dataset.value);
+                const removedValue = chip.dataset.value;
+                const idx = arr.indexOf(removedValue);
                 if (idx >= 0) arr.splice(idx, 1);
                 syncFn();
                 chip.remove();
+                const quickBtn = content.querySelector(`.topic-chip[data-topic="${CSS.escape(removedValue)}"]`);
+                if (quickBtn) quickBtn.hidden = false;
             });
             list.appendChild(chip);
         }
@@ -282,6 +285,7 @@ export function renderBehaviorStep(content, context) {
                     allowedTopics = allowedTopics.filter((value) => value !== topic);
                     syncAllowedTopics();
                     chip.remove();
+                    button.hidden = false;
                 });
                 list.appendChild(chip);
                 button.hidden = true;
@@ -304,6 +308,7 @@ export function renderBehaviorStep(content, context) {
                     blockedTopics = blockedTopics.filter((value) => value !== topic);
                     syncBlockedTopics();
                     chip.remove();
+                    button.hidden = false;
                 });
                 list.appendChild(chip);
                 button.hidden = true;

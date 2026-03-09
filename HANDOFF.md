@@ -1,4 +1,4 @@
-﻿# HANDOFF_AI_CONTEXT
+# HANDOFF_AI_CONTEXT
 
 ## 0) MACHINE-READABLE METADATA
 
@@ -6,347 +6,308 @@
 project:
   name: BetterIntelligence
   repo_root: "S:/Projects/BetterIntelligence"
-  source_reference_repo: "S:/Projects/RealChat/RealChat"
-  primary_branch: main
+  primary_branch: "main"
   stack:
     backend: ["Node.js", "Express", "Socket.io", "better-sqlite3"]
-    frontend: ["Vanilla JS SPA", "CSS"]
+    frontend: ["Vanilla JS SPA", "modular CSS architecture"]
     ai: ["Ollama", "ComfyUI", "OpenAI-compatible providers"]
-  runtime:
-    start_script: "npm start"
+runtime:
+  start:
+    default: "npm start"
     https_entry: "start-https.js"
-    env_file: ".env"
-  important_local_docs:
-    - "SYSTEMS.md"
-    - "TEST_RESULTS.md"
-    - "HANDOFF.md"
-plans:
-  implementation_master:
-    - "C:/Users/Simon/.cursor/plans/betterintelligence_implementation_4e0041ad.plan.md"
-    - "C:/Users/Simon/.cursor/plans/betterintelligence_â€”_plan_update_(architecture,_skills,_mvp_detail,_ui)_6ac55b47.plan.md"
-  chat_media_layout_plan:
-    - "C:/Users/Simon/.cursor/plans/chat_view_media_and_layout_fixes_0596efe6.plan.md"
-state:
-  overall_mvp: implemented
-  chat_media_layout_work: implemented_with_recent_regression_fixes
-  requires_manual_validation: true
+  env_file: ".env"
+  default_env_port: 3001
+frontend_entrypoints:
+  app_js: "src/client/js/app.js"
+  app_bootstrap: "src/client/js/core/bootstrap.js"
+  app_stylesheet: "src/client/styles/StyleManifest.css"
+  embed_stylesheet: "src/client/styles/views/embed/EmbedView.css"
+validation_snapshot_2026_03_09:
+  npm_test_with_running_server: "pass (64 passed, 0 failed)"
+  api_matrix_with_running_server: "pass (71 passed, 0 failed)"
+  notes:
+    - "Counts are volatile and belong only in HANDOFF.md."
+    - "Manual browser smoke is still required after major UI work."
+status:
+  acc_route_owner: "/agents"
+  agent_builder_route_owner: "/agentBuilder"
+  catalog_cutover: "active"
+  grants_usage_attribution: "implemented"
+  requires_manual_ui_smoke: true
 ```
 
 ---
 
-## 1) SYSTEM GOALS (CURRENT PRIORITIES)
+## 1) WHAT THIS APP IS
 
-1. Keep BetterIntelligence parity with planned architecture (agents + skills + chat + deployment + AI providers).
-2. Ensure chat UX is production-stable:
-   - only message pane scrolls in chat view
-   - sidebar has no horizontal overflow
-   - media upload/crop/view flow works end-to-end
-3. Preserve RealChat-inspired media behavior while adapting to BetterIntelligence architecture.
-4. Keep AI context behavior consistent: media in history should be represented as placeholders (`[image]`, `[video]`) for text models.
+BetterIntelligence is a multi-view SPA for:
 
----
+1. Building AI agents.
+2. Managing reusable skills and knowledge.
+3. Running personal and deployment-scoped chat.
+4. Publishing agents and skills through a creator-facing Catalog system.
+5. Discovering public assets through Hub.
+6. Operating deployments and admin controls.
 
-## 2) REFERENCE BASELINE: REALCHAT (DO NOT EDIT)
+Core product framing used in the app:
 
-Use RealChat as implementation reference for media UX/components:
-
-- `S:/Projects/RealChat/RealChat/src/client/js/components/MediaViewer.js`
-- `S:/Projects/RealChat/RealChat/src/client/js/components/MediaUploadPreview.js`
-- `S:/Projects/RealChat/RealChat/src/client/js/components/ImageCropView.js`
-- `S:/Projects/RealChat/RealChat/src/client/styles/views.css` (media-related sections)
-- `S:/Projects/RealChat/RealChat/server.js` (`/lib/cropperjs` static serving pattern)
-
-Constraint: RealChat is source reference only; do not modify it.
+- "Build AI agents. Share skills. Deploy bots."
 
 ---
 
-## 3) ARCHITECTURE SNAPSHOT (PARSE-ORIENTED)
+## 2) HOW THIS REPO SHOULD BE EXTENDED
 
-### Backend
+### Read order for the next agent
 
-- Entry: `server.js`
-- Static:
-  - `src/client` served as SPA assets
-  - `/media` served from configured media storage path
-  - `/lib/cropperjs` served from `node_modules/cropperjs/dist`
-- API namespaces:
-  - `/api/auth`, `/api/users`, `/api/agents`, `/api/skills`, `/api/chats`, `/api/deploy`, `/api/hub`, `/api/ai`, `/api/knowledge`, `/api/analytics`, `/api/admin`, `/api/appearance`, `/api/roles`, `/api/user/private-tags`, `/api/media`
-- Sockets:
-  - `src/server/socket/gatewaySocket.js` (authenticated chat/agent events)
-  - `src/server/socket/deploySocket.js` (embed/deploy channel)
-  - `src/server/socket/notificationsSocket.js` (user notifications)
-  - `src/server/socket/adminSocket.js` (admin model/provider realtime)
-  - `src/server/socket/analyticsSocket.js` (live analytics updates)
+1. Read `SYSTEMS.md` first for current architecture truth.
+2. Read this file second for working preferences, recent changes, and handoff context.
+3. Verify referenced paths in the repo before relying on older assumptions.
 
-### Frontend
+### File and folder placement rules
 
-- SPA root: `src/client/js/app.js`
-- Style layers:
-  - `styles/StyleManifest.css`
-  - `styles/tokens/theme.css`
-  - `styles/views/ChatView.css` (chat view ownership)
-- Media components:
-  - `src/client/js/components/MediaViewer.js`
-  - `src/client/js/components/MediaUploadPreview.js`
-  - `src/client/js/components/ImageCropView.js`
+1. Route-owned client systems live in their own view folder under `src/client/js/views/<route>/`.
+2. Route entry files live at the route folder root:
+   - `views/agents/accMainView.js`
+   - `views/agentBuilder/agentBuilderMainView.js`
+   - `views/hub/hubView.js`
+   - `views/skills/skillsView.js`
+   - `views/deploy/deployMainView.js`
+3. Route internals stay inside that same route folder unless there is a real shared-component reason to lift them.
+4. Do not create duplicate route owners for the same route. One route gets one route-level main view.
+5. Keep server routes flat in `src/server/routes/`.
+6. Keep server services flat in `src/server/services/` unless there is a clear subsystem folder already established, such as `services/billing/`.
+7. Keep repositories in `src/server/database/repositories/*Repository.js`.
 
-### AI Pipeline
+### Naming preferences
 
-- Context assembly: `src/server/ai/context/ContextBuilder.js`
-- Execution boundary: `src/server/ai/execution/AIExecution.js`
-- Providers: `src/server/ai/providers/*`
+1. ACC internals use the `acc*` prefix:
+   - `accMainView`
+   - `accRender`
+   - `accInteractions`
+   - `accOverlays`
+   - `accCharts`
+   - `accCategoryManager`
+2. Agent Builder files use the `agentBuilder*` prefix inside `views/agentBuilder/`.
+3. Use descriptive concern names over generic names like `helpers`, `system`, or `manager` unless the file is truly the owning manager/controller for that subsystem.
+4. Do not reintroduce `market` / `marketplace` as live product naming in new files. Use `catalog`, `hub`, `grants`, `ACL`, `ACC`, or `Agent Builder` as appropriate.
 
----
+### Architecture guardrails
 
-## 4) CHAT/MEDIA/LAYOUT PLAN STATUS (DETAILED)
-
-Source plan: `chat_view_media_and_layout_fixes_0596efe6.plan.md`
-
-### 4.1 Sidebar overflow + sizing
-
-Implemented:
-- `src/client/styles/views/ChatView.css`
-  - `.chat-hub__sidebar` uses `overflow-x: hidden`
-  - additional overflow guards on chat hub/list/item row
-  - truncation present for name/preview/group-name
-- `src/client/js/app.js`
-  - chat sidebar resize max width constrained against available hub width
-
-### 4.2 Chat scroll containment (messages-only scroll)
-
-Implemented with iterative fixes:
-- `src/client/styles/StyleManifest.css`
-  - `.main.main--chat` enforces hidden overflow
-  - chat hub constrained in flex chain
-  - app layout/body overflow constrained
-- `src/client/styles/views/ChatView.css`
-  - chat main/agent-chat/messages configured for `min-height: 0` + proper flex behavior
-- `src/client/styles/StyleManifest.css`
-  - viewport/root overflow behavior adjusted to avoid full-page scroll leakage
-- `src/client/js/app.js`
-  - route render sets/removes `main--chat` class based on path
-
-### 4.3 Backend media support
-
-Implemented:
-- `src/server/routes/media.js`
-  - `POST /api/media/upload` (image + video, `chatId`, 25MB limit)
-  - `POST /api/media/capture` (base64 capture payload)
-- `src/server/services/mediaService.js`
-  - `saveBase64()`, `getFilePath()`, `exists()`
-  - media filename pattern with user/chat context
-  - returns `/media/...` URLs
-- `src/server/socket/gatewaySocket.js`
-  - `chat:send` accepts `mediaUrl` and `media[]`
-  - media messages persisted/emitted with type awareness
-  - AI pipeline invocation for media-aware messaging
-
-### 4.4 Client media components
-
-Implemented:
-- `MediaViewer` fullscreen carousel + keyboard/nav behavior
-- `MediaUploadPreview` modal + single-image crop path + multi-item carousel
-- `ImageCropView` using Cropper.js v2
-- Cropper served from `/lib/cropperjs`
-- Media-related CSS sections added in `ChatView.css`
-- Added missing icons in `src/client/js/utils/dom.js` (`chevronLeft`, `chevronRight`, plus existing `paperclip`)
-
-### 4.5 Chat integration
-
-Implemented:
-- Attachment input/button in `renderChatView`
-- Upload flow:
-  - single image + crop -> `/api/media/capture`
-  - file upload -> `/api/media/upload`
-  - emit `chat:send` with media payload
-- `renderChatMessage` supports media rendering
-- click handlers open `MediaViewer`
-- `chat:message` media handling and dedupe logic present
-- `agent:media` rendering updated to clickable media message structure
-
-### 4.6 AI context placeholders
-
-Implemented:
-- `src/server/ai/context/ContextBuilder.js`
-  - history mapping includes media message types
-  - placeholders injected (`[image]`, `[video]`, or per-item)
+1. `/agents` is the Agent Control Center, not the Agent Builder.
+2. `/agentBuilder` is the editable agent builder route family.
+3. `/deploy` owns deployment workflows.
+4. `/skills` owns workspace and installed-skill workflows.
+5. `/hub` owns public discovery.
+6. `/catalog` owns authenticated creator publishing, review, grants, and entitlement APIs.
+7. Do not duplicate Deploy, Skills, or Hub workflows inside ACC.
 
 ---
 
-## 5) RECENTLY ADDRESSED REGRESSION TOPICS
+## 3) CURRENT ROUTE AND OWNERSHIP EXPECTATIONS
 
-These items were explicitly reported and then patched:
+### Client routes
 
-1. Chat page still scrolling globally instead of message area only.
-2. Agent-generated images not opening preview on click.
-3. Crop->Send flow not reliably surfacing upload failures/sends.
-4. Crop behavior direction changed: image fixed, crop rectangle movable/resizable, free ratio (non-circle).
-5. Crop initial view tuning:
-   - `cropper-image initial-center-size="contain"`
-   - center fit call after init (`$center('contain')`) for large-image downscale and small-image non-upscale behavior.
+1. `/agents`
+   - ACC only
+   - cross-system summary, control, and deep links
+2. `/agents/:id/analytics`
+   - agent analytics only
+3. `/agentBuilder`
+   - create flow
+4. `/agentBuilder/:id`
+   - edit flow
+5. `/skills`
+   - workspace, installed inventory, skill authoring
+6. `/hub`
+   - public discovery for agents and skills
+7. `/deploy`
+   - deployment hub, access policy, runtime controls
 
-Important: treat these as "patched but must be manually verified in running UI".
+### Server route families
 
----
+1. `/api/agents/*`
+   - agent CRUD
+   - agent tags/categories/private tags
+   - `/api/agents/dashboard`
+   - agent analytics support
+2. `/api/catalog/*`
+   - listings
+   - revisions
+   - reviews
+   - grants
+   - access requests
+   - entitlement resolution
+3. `/api/hub/*`
+   - public agents
+   - public skills
+   - public subscribe/install entrypoints
+4. `/api/skills/*`
+   - workspace and installed skill inventory
+5. `/api/deploy/*`
+   - deployment management
+   - deployment member management
+   - deployment access policy
+   - embed/runtime entrypoints
 
-## 6) CURRENT MEDIA CROP DESIGN CONTRACT
+### What must not be duplicated
 
-`src/client/js/components/ImageCropView.js` intended behavior:
-
-- Rectangle mode:
-  - free aspect ratio crop selection
-  - selection movable + resizable
-  - image intended to initialize centered with contain-fit semantics
-- Circle mode:
-  - 1:1 selection enforced
-  - output masked to circular JPEG
-- Export:
-  - via `selection.$toCanvas()`
-  - JPEG output quality 0.92
-
----
-
-## 7) SYSTEMS INVENTORY (CANONICAL)
-
-Use `SYSTEMS.md` as canonical inventory of:
-
-- Auth + users
-- Agent CRUD
-- AI provider registry/status
-- ContextBuilder/AIExecution flow
-- Gateway/deploy/notifications/admin/analytics sockets
-- Chats/messages
-- Skills FS + hub
-- Knowledge ingestion/chunking
-- Analytics event logging
-- Deployment/embed pipeline
-- Hooks/event dispatch
-- Logging subsystem
-
-If uncertain about endpoint ownership, resolve via `SYSTEMS.md` first.
-
-Availability source-of-truth:
-- `src/server/services/agentAvailabilityService.js` is canonical for `modelStatuses[]` + `modelStatus`.
-- Agents and Chats payloads should reuse this service (no duplicated route-local inference logic).
+1. Do not put builder editing flows back under `/agents`.
+2. Do not put deployment management back into ACC.
+3. Do not make Hub depend on private Agents or Skills workspace endpoints for public discovery behavior.
+4. Do not create a second grants or entitlement system for agents, skills, and deployments.
 
 ---
 
-## 8) VALIDATION STATUS
+## 4) RECENT COMPLETED ARCHITECTURE CHANGES
 
-From `TEST_RESULTS.md`:
-- historical programmatic checks reported passing
-- multiple manual verification items still listed
+These are the major recent shifts that matter for future work:
 
-Additional required manual validation after chat/media/layout patches:
-
-```yaml
-manual_validation_required:
-  - chat_scroll_isolated_to_messages: true
-  - chat_sidebar_no_horizontal_scroll: true
-  - click_agent_generated_image_opens_media_viewer: true
-  - single_image_crop_send_emits_chat_media_message: true
-  - cropper_initial_center_contain_behavior:
-      no_upscale_small_images: true
-      downscale_large_images_preserving_ratio: true
-      selection_move_resize_works: true
-```
-
----
-
-## 9) CRITICAL FILE MAP FOR NEXT AGENT
-
-### Frontend high-priority
-
-- `src/client/js/app.js`
-  - route handling + `main--chat` class application
-  - `renderChatHub`
-  - `renderChatView`
-  - media upload flow
-  - media click handling
-  - `renderChatMessage`
-- `src/client/js/components/ImageCropView.js`
-- `src/client/js/components/MediaUploadPreview.js`
-- `src/client/js/components/MediaViewer.js`
-- `src/client/js/utils/dom.js`
-- `src/client/styles/StyleManifest.css`
-- `src/client/styles/views/ChatView.css`
-
-### Backend high-priority
-
-- `server.js`
-- `src/server/routes/media.js`
-- `src/server/services/mediaService.js`
-- `src/server/services/agentAvailabilityService.js`
-- `src/server/services/realtimeBus.js`
-- `src/server/socket/gatewaySocket.js`
-- `src/server/socket/notificationsSocket.js`
-- `src/server/socket/adminSocket.js`
-- `src/server/socket/analyticsSocket.js`
-- `src/server/ai/context/ContextBuilder.js`
+1. Agent Builder was extracted from `/agents` into its own `/agentBuilder` route family and folder.
+2. `/agents` was stabilized as the Agent Control Center route owner.
+3. Internal creator publishing/access management moved to `/api/catalog/*`.
+4. The old Market surface was removed from live route ownership.
+5. Hub public reads were sanitized and decoupled from old private/workspace dependencies.
+6. Skills became DB-first:
+   - canonical skill definitions live in the database
+   - `skill_installations` owns installed-skill persistence
+   - `SKILL.md` is materialized output, not canonical state
+7. Strict catalog cutover was implemented:
+   - public/shared runtime access now comes from Catalog-backed entitlements
+   - old `hub_published` style runtime fallback is no longer the active model
+8. Unified grants and usage attribution were introduced:
+   - grants govern runtime access, feature gates, quotas, and lineage
+   - `usage_attribution_legs` supports one authoritative total plus mirrored attribution views
 
 ---
 
-## 10) KNOWN IMPLEMENTATION RISKS
+## 5) CURRENT IMPORTANT IMPLEMENTATION CONTEXT
 
-1. **Scroll containment is CSS-chain sensitive**  
-   Any change to `height/min-height/overflow/flex` in `StyleManifest.css` or chat view owner files can reintroduce page-level scroll.
+### Grants vs ACL
 
-2. **Media click path depends on markup shape**  
-   Event delegation expects `.chat-msg__media-thumb` / `.chat-msg__image` and parent `.chat-msg` dataset payloads.
+1. Grants are entitlements only.
+2. Grants currently support `user`, `deployment`, and `org` subjects.
+3. Grants govern:
+   - runtime access
+   - feature gates
+   - quota limits
+   - listing/plan lineage
+   - billing subject linkage
+   - usage attribution lineage
+4. ACL governs management/operator authorization.
+5. Do not merge grants and ACL into one system.
 
-3. **Cropper API is web-component based (v2)**  
-   Minor template attribute changes can alter interaction semantics dramatically.
+### Actor model
 
-4. **Large base64 capture payloads**  
-   Works within configured JSON limit; failures should surface via toast/error paths.
+Current terms used by the backend:
+
+1. owner
+   - owns the resource or listing
+2. grant subject
+   - the subject receiving an entitlement
+   - currently `user`, `deployment`, or `org`
+3. billing subject
+   - the subject responsible for the authoritative billable leg
+4. deployment runtime subject
+   - a deployment acting as the runtime consumer under a sponsor or budget grant
+5. collaborator/operator
+   - a human manager/admin authorized by ACL, not by grants
+
+### Deployment sponsorship vs deployment membership
+
+1. A deployment sponsor grant is runtime sponsorship only.
+2. Deployment sponsor grants do not grant human operator rights.
+3. Deployment member/admin/manager rights still come from deployment ACL, not grants.
+
+### Deployment access policy modes
+
+Current deployment runtime policy modes are:
+
+1. `public_sponsored`
+2. `authenticated_entitled`
+3. `internal_only`
+
+Treat these as deploy-owned runtime policy, not as ACC policy.
+
+### Compatibility names intentionally retained
+
+These still exist and are expected for compatibility/history reasons:
+
+1. `can_manage_marketplace`
+2. `can_moderate_marketplace`
+3. `m026_marketplace_foundation`
+
+Treat them as retained compatibility identifiers, not current product naming.
 
 ---
 
-## 11) OPERATIONAL RUNBOOK
+## 6) VALIDATION WORKFLOW
 
-```bash
-cd S:\Projects\BetterIntelligence
-npm install
-npm start
-```
+### Commands
 
-Default local assumptions:
+1. Start server:
+   - `npm start`
+2. Programmatic test suite:
+   - `npm test`
+3. API matrix:
+   - `node scripts/run-api-tests.js https://localhost:3001`
+4. Targeted syntax checks when editing JS:
+   - `node --check <file>`
 
-- HTTPS dev entry active through `start-https.js`
-- `/lib/cropperjs/*` available from server static config
-- `/media/*` available and writable from configured media path
+### Latest validated snapshot
 
----
+Verified on 2026-03-09:
 
-## 12) NEXT-AGENT EXECUTION PROTOCOL
+1. `npm test`
+   - `64 passed, 0 failed`
+2. `node scripts/run-api-tests.js https://localhost:3001`
+   - `71 passed, 0 failed`
 
-1. Read this file.
-2. Read `SYSTEMS.md`.
-3. Read `C:/Users/Simon/.cursor/plans/chat_view_media_and_layout_fixes_0596efe6.plan.md`.
-4. Reproduce chat/media UI in running app before changing code.
-5. Validate reported behavior in this order:
-   - scroll containment
-   - sidebar overflow
-   - media click preview
-   - crop send flow
-   - crop contain centering semantics
-6. Make minimal targeted edits; avoid broad CSS refactors.
-7. Re-run manual checks.
-8. Update this handoff with exact residual failures (if any).
+### What still commonly needs manual verification
+
+1. Browser/UI smoke for ACC interactions and layout.
+2. Complex Agent Builder step flows.
+3. Deployment operator flows in `/deploy`.
+4. Embed/deployment runtime flows when deployment access policy changes.
+5. Visual polish work across Hub, ACC, and Deploy.
 
 ---
 
-## 13) SUCCESS CRITERIA FOR THIS HANDOFF THREAD
+## 7) CURRENT KNOWN RISKS OR FOLLOW-UP ZONES
 
-```yaml
-done_when:
-  - chat_window_containerized_and_page_not_scrolling_in_chat: true
-  - sidebar_no_horizontal_scroll: true
-  - image_and_video_preview_click_path_works: true
-  - single_image_crop_send_path_works: true
-  - cropper_initial_view_is_centered_contain:
-      no_upscale_small_images: true
-      downscale_large_images: true
-```
+1. Large orchestrator files still exist in some route owners, especially Agent Builder and parts of ACC.
+2. ACC changes need manual browser smoke because interaction density is high.
+3. Deployment access policy and deployment ACL are sensitive integration areas; keep runtime entitlements and operator authorization separate.
+4. Doc drift can happen quickly after architectural changes; update both `SYSTEMS.md` and this file when ownership boundaries move.
+5. Keep route boundaries clean:
+   - ACC summarizes and links
+   - Hub discovers
+   - Skills edits and installs
+   - Deploy manages deployments
+   - Catalog manages creator publishing and entitlements
 
+---
 
+## 8) DO-NOT-BREAK CONTRACTS
+
+1. Keep `/agents` as ACC only.
+2. Keep `/agentBuilder` as the only Agent Builder route family.
+3. Keep `/hub` as the public discovery surface.
+4. Keep `/api/catalog/*` as the creator publishing/access management surface.
+5. Keep skills DB-canonical and `skill_installations` authoritative for installs.
+6. Keep grants as entitlements and ACL as management authorization.
+7. Do not reintroduce `/api/market/*` or `/api/agents/hub`.
+
+---
+
+## 9) NEXT-AGENT EXECUTION PROTOCOL
+
+1. Read `SYSTEMS.md`.
+2. Read this file fully.
+3. Verify route/file ownership before moving files or introducing new folders.
+4. Prefer the smallest structural change that preserves the established route boundaries.
+5. Re-run relevant validation after edits.
+6. Update both docs whenever:
+   - route ownership changes
+   - core system owners change
+   - validation workflow changes
+   - recent architecture changes should be handed to the next agent

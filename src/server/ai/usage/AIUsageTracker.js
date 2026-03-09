@@ -1,5 +1,6 @@
 const aiModelCatalogService = require('../services/aiModelCatalogService');
 const notificationService = require('../../services/notificationService');
+const catalogEntitlementService = require('../../services/catalogEntitlementService');
 const log = require('../../services/Logger')('ai-usage');
 
 function toInt(value) {
@@ -30,7 +31,11 @@ function toErrorMessage(error) {
 
 function record(payload) {
     try {
-        aiModelCatalogService.recordModelUsage(payload);
+        const usageEventId = aiModelCatalogService.recordModelUsage(payload);
+        catalogEntitlementService.recordUsageFromUsageEvent({
+            ...payload,
+            usageEventId
+        });
         notificationService.emitAdminModelUsageUpdate({
             providerName: String(payload?.providerName || '').trim().toLowerCase(),
             modelId: String(payload?.modelId || '').trim(),

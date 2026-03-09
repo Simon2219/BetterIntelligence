@@ -10,8 +10,8 @@ export async function renderHubAgentsView({
 }) {
     try {
         const [{ data: agents }, { data: allTags }] = await Promise.all([
-            api('/agents/hub'),
-            api('/agents/tags').catch(() => ({ data: [] }))
+            api('/hub/agents'),
+            api('/hub/agents/tags').catch(() => ({ data: [] }))
         ]);
         const tagFilter = new URLSearchParams(location.search).get('tag') || '';
         const filtered = !tagFilter
@@ -21,7 +21,7 @@ export async function renderHubAgentsView({
         container.innerHTML = `
             <div class="container">
                 <div class="view-header">
-                    <h2 class="view-header__title">Bot Hub</h2>
+                    <h2 class="view-header__title">Hub</h2>
                     <div class="view-header__actions">
                         ${(allTags || []).length ? `
                         <select id="hub-agent-tag-filter" class="form-input form-input--sm ui-select-compact">
@@ -84,7 +84,7 @@ export async function renderHubAgentsView({
         container.querySelectorAll('.btn-hub-sub').forEach((button) => {
             button.addEventListener('click', async () => {
                 try {
-                    await api(`/agents/${button.dataset.id}/subscribe`, { method: 'POST' });
+                    await api(`/hub/agents/${button.dataset.id}/subscribe`, { method: 'POST' });
                     showToast('Subscribed!', 'success');
                     await rerender('/hub/agents' + (location.search || ''));
                 } catch (error) {

@@ -8,10 +8,18 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 require('dotenv').config();
+const Config = require('../config/Config');
 
 const root = path.join(__dirname, '..');
 const results = [];
-const port = parseInt(process.env.PORT || '3000', 10);
+const configuredPort = parseInt(process.env.PORT || Config.get('server.port', '3000'), 10);
+const preferredHttps = process.env.SSL_KEY_PATH || process.env.HTTPS === 'true' || process.env.USE_HTTPS === '1';
+let apiTarget = {
+  hostname: 'localhost',
+  port: configuredPort,
+  client: preferredHttps ? https : http,
+  proto: preferredHttps ? 'https' : 'http'
+};
 
 function pass(id, msg) {
   results.push({ id, status: 'PASS', msg });
@@ -72,15 +80,15 @@ function loadServerSurface() {
 function httpRequest(method, urlPath, body, token) {
   return new Promise((resolve, reject) => {
     const opts = {
-      hostname: 'localhost',
-      port,
+      hostname: apiTarget.hostname,
+      port: apiTarget.port,
       path: urlPath,
       method,
       headers: { 'Content-Type': 'application/json' },
       rejectUnauthorized: false
     };
     if (token) opts.headers['Authorization'] = `Bearer ${token}`;
-    const r = client.request(opts, (res) => {
+    const r = apiTarget.client.request(opts, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => {
@@ -91,6 +99,29 @@ function httpRequest(method, urlPath, body, token) {
     r.on('error', reject);
     if (body) r.write(JSON.stringify(body));
     r.end();
+  });
+}
+
+function probeServer(target) {
+  return new Promise((resolve) => {
+    const req = target.client.get(
+      `${target.proto}://${target.hostname}:${target.port}/api/appearance`,
+      { rejectUnauthorized: false },
+      (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            const ok = data?.data?.dark && data?.data?.light;
+            resolve(ok ? { target, data } : null);
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on('error', () => resolve(null));
   });
 }
 
@@ -106,32 +137,29 @@ try {
 }
 
 // 1-2: Config / API
-const useHttps = process.env.SSL_KEY_PATH || process.env.HTTPS === 'true';
-const client = useHttps ? https : http;
-const proto = useHttps ? 'https' : 'http';
-const req = client.get(
-  `${proto}://localhost:${port}/api/appearance`,
-  { rejectUnauthorized: false },
-  (res) => {
-    let body = '';
-    res.on('data', (c) => (body += c));
-    res.on('end', () => {
-      try {
-        const data = JSON.parse(body);
-        const ok = data?.data?.dark && data?.data?.light;
-        if (ok) pass('1-2', 'GET /api/appearance returns dark and light');
-        else fail('1-2', 'Missing dark/light in response');
-      } catch (e) {
-        fail('1-2', e.message);
-      }
+const probeTargets = [
+  apiTarget,
+  { hostname: 'localhost', port: 3001, client: https, proto: 'https' },
+  { hostname: '127.0.0.1', port: 3001, client: https, proto: 'https' },
+  { hostname: 'localhost', port: 3000, client: http, proto: 'http' },
+  { hostname: '127.0.0.1', port: 3000, client: http, proto: 'http' }
+].filter((target, index, list) => list.findIndex((candidate) =>
+  candidate.hostname === target.hostname && candidate.port === target.port && candidate.proto === target.proto
+) === index);
+
+(async () => {
+  for (const target of probeTargets) {
+    const hit = await probeServer(target);
+    if (hit) {
+      apiTarget = target;
+      pass('1-2', `GET /api/appearance returns dark and light via ${target.proto}://${target.hostname}:${target.port}`);
       runRemaining();
-    });
+      return;
+    }
   }
-);
-req.on('error', () => {
-  fail('1-2', 'Server not reachable (is npm start running?)');
+  fail('1-2', 'Server not reachable on the normal startup targets');
   runRemaining();
-});
+})();
 
 function runRemaining() {
   const cssSurface = loadClientCssSurface();
@@ -160,8 +188,9 @@ function runRemaining() {
   else fail('3-3', 'Section styling');
   if (appJs.includes('New Skills') && appJs.includes('Popular Agents')) pass('3-4', 'Layout sections');
   else fail('3-4', 'Missing section headings');
-  if (appJs.includes('/agents/hub') && appJs.includes('navigate')) pass('3-5', 'Hub redirect');
-  else fail('3-5', 'Redirect logic');
+  if (!appJs.includes('/agents/hub') && appJs.includes("path === '/hub' || path.startsWith('/hub/')"))
+    pass('3-5', 'Hub route owns navigation without legacy /agents/hub redirect');
+  else fail('3-5', 'Legacy /agents/hub redirect still present or Hub route missing');
   pass('3-6', 'Integration (manual verify install)');
 
   // 4-x: Agent Builder

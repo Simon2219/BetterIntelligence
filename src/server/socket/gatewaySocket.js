@@ -3,10 +3,11 @@
  * Events: agent:invoke, agent:stream, agent:done, agent:media, agent:error
  */
 const Config = require('../../../config/Config');
-const { UserRepository, AIAgentRepository, ChatRepository, AnalyticsRepository, SubscriptionRepository } = require('../database');
+const { UserRepository, AIAgentRepository, ChatRepository, AnalyticsRepository } = require('../database');
 const HooksService = require('../services/HooksService');
 const ProviderRegistry = require('../ai/providers/ProviderRegistry');
 const MainAIManager = require('../ai/MainAIManager');
+const catalogEntitlementService = require('../services/catalogEntitlementService');
 const { authenticateSocket } = require('./socketAuth');
 const socketSessionRegistry = require('../services/socketSessionRegistry');
 const notificationService = require('../services/notificationService');
@@ -28,7 +29,8 @@ async function runAIPipeline(io, socket, chat, userId, message, opts = {}) {
     const chatId = chat.id;
     const agentId = chat.ai_agent_id || chat.participant_2;
     log.info('runAIPipeline start', { chatId, agentId, userId });
-    const agent = AIAgentRepository.getById(agentId);
+    const agent = catalogEntitlementService.getRuntimeAgentForResolvedEntitlement(opts.catalogEntitlement, agentId)
+        || AIAgentRepository.getById(agentId);
     if (!agent) {
         const placeholder = 'Agent not found.';
         const assistantMsg = { senderId: agentId || 'assistant', type: 'text', content: placeholder, timestamp: new Date().toISOString() };
@@ -62,7 +64,15 @@ async function runAIPipeline(io, socket, chat, userId, message, opts = {}) {
     Logger.appendToAgentLog(agentId, `[${now}] [INVOKE] conv=${chatId} user=${userId} msg=${message.substring(0, 120)}`);
     HooksService.fire('message_received', { agentId, conversationId: chatId, userId, message });
 
-    const usageContext = { source: 'chat', userId, agentId, chatId };
+    const usageContext = {
+        source: 'chat',
+        userId,
+        agentId,
+        chatId,
+        metadata: catalogEntitlementService.buildUsageMetadata(opts.catalogEntitlement, {
+            chatId
+        })
+    };
     const invokeStart = Date.now();
     const result = await MainAIManager.runAgentPipeline({ agent, user, chatId, message, usageContext });
 
@@ -218,6 +228,18 @@ function initGatewaySocket(io) {
                 return;
             }
             const chat = access.chat;
+            let entitlement;
+            try {
+                entitlement = catalogEntitlementService.assertUserCanAccessAsset({
+                    userId,
+                    assetType: 'agent',
+                    assetId: chat.ai_agent_id || chat.participant_2,
+                    action: 'chat'
+                });
+            } catch (err) {
+                socket.emit('agent:error', { error: err.message || 'Access denied', chatId });
+                return;
+            }
             const now = new Date().toISOString();
             const userMsg = hasMedia
                 ? { senderId: userId, type: 'media', content: '', media, timestamp: now }
@@ -233,7 +255,10 @@ function initGatewaySocket(io) {
                 : hasMediaUrl
                     ? content || (type === 'video' ? '[video]' : '[image]')
                     : content;
-            runAIPipeline(io, socket, chat, userId, aiContent, { userMsgAlreadyAdded: true }).catch(err => {
+            runAIPipeline(io, socket, chat, userId, aiContent, {
+                userMsgAlreadyAdded: true,
+                catalogEntitlement: entitlement
+            }).catch(err => {
                 log.error('chat:send AI pipeline error', { err: err.message, chatId });
                 socket.emit('chat:typing', { chatId, conversationId: chatId, isTyping: false });
                 socket.emit('agent:error', { error: err.message || 'Failed to process message', chatId, conversationId: chatId });
@@ -268,10 +293,16 @@ function initGatewaySocket(io) {
                     socket.emit('agent:error', { error: 'Agent not found' });
                     return;
                 }
-                const isOwner = agent.user_id && agent.user_id.toUpperCase() === userId.toUpperCase();
-                const isSubscribed = SubscriptionRepository.isSubscribed(userId, agentId);
-                if (!isOwner && !isSubscribed) {
-                    socket.emit('agent:error', { error: 'Agent not found' });
+                let entitlement;
+                try {
+                    entitlement = catalogEntitlementService.assertUserCanAccessAsset({
+                        userId,
+                        assetType: 'agent',
+                        assetId: agentId,
+                        action: 'chat'
+                    });
+                } catch (err) {
+                    socket.emit('agent:error', { error: err.message || 'Access denied' });
                     return;
                 }
 
@@ -291,7 +322,9 @@ function initGatewaySocket(io) {
                         socket.emit('agent:done', { conversationId: chatId, response: greeting, isGreeting: true });
                     }
                 }
-                await runAIPipeline(io, socket, chat, userId, message);
+                await runAIPipeline(io, socket, chat, userId, message, {
+                    catalogEntitlement: entitlement
+                });
             } catch (err) {
                 log.error('agent:invoke error', { err: err.message, stack: err.stack?.substring(0, 300) });
                 const errMsg = err.message || 'Unknown error';

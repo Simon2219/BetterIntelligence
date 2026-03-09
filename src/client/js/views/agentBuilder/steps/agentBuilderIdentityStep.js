@@ -17,7 +17,7 @@ export function renderIdentityStep(content, context) {
         </div>
         <div class="agent-identity-layout">
             <div class="avatar-preview">
-                <img id="avatar-preview-img" src="${escapeHtml(avatarSrc)}" alt="Avatar" class="avatar-preview__img">
+                <img id="avatar-preview-img" src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(formData.name || 'Agent')} avatar" class="avatar-preview__img">
                 <button type="button" class="btn btn-ghost btn-sm" id="agent-avatar-edit">Edit Avatar</button>
                 <input type="file" id="agent-avatar-file" accept="image/jpeg,image/png,image/gif,image/webp" class="agent-avatar-file-input">
             </div>
@@ -66,20 +66,25 @@ export function renderIdentityStep(content, context) {
     const avatarEditBtn = content.querySelector('#agent-avatar-edit');
     const avatarFileInput = content.querySelector('#agent-avatar-file');
 
+    let _tagDebounceTimer;
+    const _docClickHandler = (event) => {
+        const dropdown = content.querySelector('#agent-tags-dropdown');
+        if (dropdown && !content.contains(event.target)) dropdown.style.display = 'none';
+    };
+
     (function setupTags() {
         const tagList = content.querySelector('#agent-tags-list');
         const tagInput = content.querySelector('#agent-tags-input');
         const dropdown = content.querySelector('#agent-tags-dropdown');
-        let debounceTimer;
 
         tagInput?.addEventListener('input', () => {
-            clearTimeout(debounceTimer);
+            clearTimeout(_tagDebounceTimer);
             const query = tagInput.value.trim();
             if (!query) {
                 dropdown.style.display = 'none';
                 return;
             }
-            debounceTimer = setTimeout(async () => {
+            _tagDebounceTimer = setTimeout(async () => {
                 try {
                     const { data: tags } = await api(`/agents/tags?q=${encodeURIComponent(query)}`);
                     if (!tags?.length) {
@@ -137,9 +142,7 @@ export function renderIdentityStep(content, context) {
             }
         });
 
-        document.addEventListener('click', (event) => {
-            if (!content.contains(event.target)) dropdown.style.display = 'none';
-        });
+        document.addEventListener('click', _docClickHandler);
 
         tagList?.querySelectorAll('.tag-chip__remove').forEach((button) => button.addEventListener('click', () => button.closest('.tag-chip')?.remove()));
     })();
@@ -171,4 +174,9 @@ export function renderIdentityStep(content, context) {
         }
         event.target.value = '';
     });
+
+    return () => {
+        clearTimeout(_tagDebounceTimer);
+        document.removeEventListener('click', _docClickHandler);
+    };
 }

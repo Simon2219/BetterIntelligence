@@ -28,7 +28,7 @@ export async function renderDeployWorkspace({
     const capabilities = deploymentCapabilities(data?.access || {});
     const tabs = [{ id: 'overview', label: 'Overview' }];
     if (capabilities.canViewChats) tabs.push({ id: 'chats', label: 'Chats' });
-    if (capabilities.canManageMembers) tabs.push({ id: 'access', label: 'Access' });
+    if (capabilities.canManageMembers || capabilities.canManageConfig) tabs.push({ id: 'access', label: 'Access' });
     if (capabilities.canViewChats) tabs.push({ id: 'stats', label: 'Statistics' });
     const tab = tabs.some((item) => item.id === requestedTab) ? requestedTab : tabs[0].id;
 
@@ -78,6 +78,7 @@ export async function renderDeployWorkspace({
         await renderDeployChatsTab({
             content,
             slug,
+            data,
             capabilities,
             api,
             showToast,
@@ -91,6 +92,7 @@ export async function renderDeployWorkspace({
         await renderDeployAccessTab({
             content,
             slug,
+            data,
             capabilities,
             api,
             showToast,
@@ -103,6 +105,7 @@ export async function renderDeployWorkspace({
         await renderDeployStatsTab({
             content,
             slug,
+            data,
             api,
             escapeHtml
         });

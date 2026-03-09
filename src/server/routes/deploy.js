@@ -7,13 +7,17 @@ const {
     AIAgentRepository,
     ChatRepository,
     HookConfigRepository,
-    UserRepository
+    UserRepository,
+    CatalogListingRepository,
+    CatalogEntitlementRepository,
+    DeploymentAccessPolicyRepository
 } = require('../database');
 const { authenticate } = require('../middleware/auth');
 const HooksService = require('../services/HooksService');
 const deploymentAclService = require('../services/deploymentAclService');
 const deploymentChatService = require('../services/deploymentChatService');
 const deploymentStatsService = require('../services/deploymentStatsService');
+const catalogEntitlementService = require('../services/catalogEntitlementService');
 const { safeErrorMessage } = require('../utils/httpErrors');
 const { isSameUser, parseBoolean } = require('../utils/helperFunctions');
 
@@ -52,9 +56,98 @@ function serializeMember(member) {
     };
 }
 
+function serializeRevisionOption(revision, currentRevisionId, approvedRevisionId, pinnedRevisionId) {
+    if (!revision) return null;
+    return {
+        id: revision.id,
+        revisionNumber: revision.revision_number || 0,
+        title: revision.title || '',
+        reviewStatus: revision.review_status || 'draft',
+        createdAt: revision.created_at || null,
+        submittedAt: revision.submitted_at || null,
+        isCurrent: String(revision.id) === String(currentRevisionId || ''),
+        isApproved: String(revision.id) === String(approvedRevisionId || ''),
+        isPinned: String(revision.id) === String(pinnedRevisionId || '')
+    };
+}
+
+function serializeGrantOption(grant) {
+    if (!grant) return null;
+    return {
+        id: grant.id,
+        subjectType: grant.subject_type || null,
+        subjectId: grant.subject_id || null,
+        grantType: grant.grant_type || null,
+        status: grant.status || null,
+        featureGates: grant.feature_gates || {},
+        quota: catalogEntitlementService.resolveAssetEntitlement({
+            subjectType: grant.subject_type,
+            subjectId: grant.subject_id,
+            assetType: grant.asset_type,
+            assetId: grant.asset_id
+        }).quota
+    };
+}
+
+function isValidSponsorGrantForDeployment(grant, deployment) {
+    if (!grant || !deployment) return false;
+    return String(grant.owner_id || '').toUpperCase() === String(deployment.owner_user_id || '').toUpperCase()
+        && String(grant.asset_type || '') === 'agent'
+        && String(grant.asset_id || '') === String(deployment.agent_id)
+        && String(grant.subject_type || '') === 'deployment'
+        && String(grant.subject_id || '') === String(deployment.id);
+}
+
+function buildDeploymentManagementData(deployment, opts = {}) {
+    const accessPolicy = catalogEntitlementService.getDeploymentAccessPolicySummary(deployment) || null;
+    const runtimeHealth = catalogEntitlementService.getDeploymentRuntimeHealth(deployment);
+    if (opts.includeCatalog === false) {
+        return {
+            accessPolicy,
+            runtimeHealth,
+            catalog: null
+        };
+    }
+
+    const listing = CatalogListingRepository.getByAsset('agent', deployment.agent_id);
+    const revisions = listing
+        ? CatalogListingRepository.listRevisions(listing.id).map((revision) => serializeRevisionOption(
+            revision,
+            listing.current_revision_id,
+            listing.current_approved_revision_id,
+            accessPolicy?.pinned_revision_id
+        ))
+        : [];
+    const sponsorGrantOptions = (deployment.owner_user_id
+        ? CatalogEntitlementRepository.listGrantsByOwner('user', deployment.owner_user_id, { status: 'active' })
+        : []
+    )
+        .filter((grant) => isValidSponsorGrantForDeployment(grant, deployment))
+        .map((grant) => serializeGrantOption(grant))
+        .filter(Boolean);
+
+    return {
+        accessPolicy,
+        runtimeHealth,
+        catalog: {
+            listing: listing ? {
+                id: listing.id,
+                title: listing.title,
+                status: listing.status,
+                visibility: listing.visibility,
+                currentRevisionId: listing.current_revision_id || null,
+                approvedRevisionId: listing.current_approved_revision_id || null
+            } : null,
+            revisions,
+            sponsorGrantOptions
+        }
+    };
+}
+
 
 function serializeDeploymentForList(row, userId) {
     const access = deploymentAclService.resolveDeploymentAccess(row, userId);
+    const management = buildDeploymentManagementData(row, { includeCatalog: false });
     return {
         id: row.id,
         slug: row.slug,
@@ -74,7 +167,9 @@ function serializeDeploymentForList(row, userId) {
             name: row.agent_name || null,
             avatarUrl: row.agent_avatar_url || null
         },
-        access: serializeAccess(access)
+        access: serializeAccess(access),
+        accessPolicy: management.accessPolicy,
+        runtimeHealth: management.runtimeHealth
     };
 }
 
@@ -148,29 +243,85 @@ router.post('/', authenticate, (req, res) => {
 
         const agent = AIAgentRepository.getById(agentId);
         if (!agent) return res.status(404).json({ success: false, error: 'Agent not found' });
+        const entitlement = catalogEntitlementService.assertUserCanCreateDeployment({
+            userId: req.user.id,
+            agentId
+        });
 
         const existing = DeploymentRepository.getBySlug(safeSlug);
         if (existing) return res.status(409).json({ success: false, error: 'Slug taken' });
 
         const dep = DeploymentRepository.create(agentId, safeSlug, req.user.id);
+        const listing = CatalogListingRepository.getByAsset('agent', agentId);
+        const sponsorGrant = CatalogEntitlementRepository.createGrant({
+            ownerType: 'user',
+            ownerId: req.user.id,
+            listingId: listing?.id || null,
+            revisionId: listing?.current_approved_revision_id || listing?.current_revision_id || null,
+            assetType: 'agent',
+            assetId: agentId,
+            subjectType: 'deployment',
+            subjectId: String(dep.id),
+            grantType: 'deployment_sponsor',
+            status: 'active',
+            parentGrantId: entitlement?.grant?.id || null,
+            grantScope: 'deployment_sponsor',
+            billingSubjectType: 'deployment',
+            billingSubjectId: String(dep.id),
+            actorScope: 'guest',
+            featureGates: {
+                can_chat: true,
+                can_copy: false,
+                can_deploy: false,
+                can_api: false,
+                can_install: false,
+                can_use_skill: false,
+                can_commercial_use: false
+            },
+            quotaLimits: {
+                monthly_invocations: 1000,
+                monthly_tokens: 250000
+            },
+            metadata: {
+                source: 'deployment_create',
+                parentGrantId: entitlement?.grant?.id || null
+            },
+            createdBy: req.user.id
+        });
+        DeploymentAccessPolicyRepository.upsert(dep.id, {
+            consumerAccessMode: (dep.embed_enabled ?? 1) === 1 ? 'public_sponsored' : 'internal_only',
+            pinnedRevisionId: listing?.current_approved_revision_id || listing?.current_revision_id || null,
+            sponsorGrantId: sponsorGrant.id,
+            metadata: {
+                source: 'deployment_create'
+            }
+        });
+        if (entitlement?.grant?.id) {
+            catalogEntitlementService.recordUsage({
+                grantId: entitlement.grant.id,
+                metricKey: 'monthly_deployments',
+                delta: 1
+            });
+        }
         res.status(201).json({ success: true, data: dep });
     } catch (err) {
-        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        res.status(err.statusCode || 500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
 router.get('/:slug', (req, res) => {
     const dep = DeploymentRepository.getBySlug(req.params.slug);
     if (!dep) return res.status(404).json({ success: false, error: 'Deployment not found' });
-    const agent = AIAgentRepository.getById(dep.agent_id);
+    const agent = catalogEntitlementService.getDeploymentRuntimeAgent(dep) || AIAgentRepository.getById(dep.agent_id);
     res.json({ success: true, data: { slug: dep.slug, agent: agent ? { name: agent.name } : null } });
 });
 
 router.get('/:slug/manage', authenticate, loadDeployment, requireDeploymentAction(DEPLOYMENT_ACTIONS.VIEW_DEPLOYMENT), (req, res) => {
     try {
         const dep = req.dep;
-        const agent = AIAgentRepository.getById(dep.agent_id);
+        const agent = catalogEntitlementService.getDeploymentRuntimeAgent(dep) || AIAgentRepository.getById(dep.agent_id);
         const operational = deploymentStatsService.getDeploymentOperationalSummary(dep.id);
+        const management = buildDeploymentManagementData(dep);
         res.json({
             success: true,
             data: {
@@ -194,7 +345,81 @@ router.get('/:slug/manage', authenticate, loadDeployment, requireDeploymentActio
                     imageModel: agent.image_model || ''
                 } : null,
                 access: serializeAccess(req.deploymentAccess),
-                operational
+                operational,
+                accessPolicy: management.accessPolicy,
+                runtimeHealth: management.runtimeHealth,
+                catalog: management.catalog
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+router.get('/:slug/access-policy', authenticate, loadDeployment, requireDeploymentAction(DEPLOYMENT_ACTIONS.MANAGE_CONFIG), (req, res) => {
+    try {
+        const management = buildDeploymentManagementData(req.dep);
+        res.json({
+            success: true,
+            data: {
+                accessPolicy: management.accessPolicy,
+                runtimeHealth: management.runtimeHealth,
+                catalog: management.catalog
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+router.patch('/:slug/access-policy', authenticate, loadDeployment, requireDeploymentAction(DEPLOYMENT_ACTIONS.MANAGE_CONFIG), (req, res) => {
+    try {
+        const listing = CatalogListingRepository.getByAsset('agent', req.dep.agent_id);
+        const revisions = listing ? CatalogListingRepository.listRevisions(listing.id) : [];
+        const currentPolicy = catalogEntitlementService.getEffectiveDeploymentAccessPolicy(req.dep);
+        const nextMode = req.body?.consumerAccessMode !== undefined
+            ? String(req.body.consumerAccessMode || '').trim().toLowerCase()
+            : String(currentPolicy?.consumer_access_mode || 'internal_only').trim().toLowerCase();
+        const nextPinnedRevisionId = req.body?.pinnedRevisionId === '' ? null : req.body?.pinnedRevisionId;
+        const nextSponsorGrantId = req.body?.sponsorGrantId === '' ? null : req.body?.sponsorGrantId;
+        const effectiveSponsorGrantId = req.body?.sponsorGrantId !== undefined
+            ? nextSponsorGrantId
+            : currentPolicy?.sponsor_grant_id || null;
+
+        if (nextPinnedRevisionId && !revisions.some((revision) => String(revision.id) === String(nextPinnedRevisionId))) {
+            return res.status(400).json({ success: false, error: 'Pinned revision must belong to this deployment listing' });
+        }
+
+        if (nextSponsorGrantId) {
+            const sponsorGrant = CatalogEntitlementRepository.getGrantById(nextSponsorGrantId);
+            if (!sponsorGrant) {
+                return res.status(404).json({ success: false, error: 'Sponsor grant not found' });
+            }
+            if (!isValidSponsorGrantForDeployment(sponsorGrant, req.dep)) {
+                return res.status(400).json({ success: false, error: 'Sponsor grant must be the deployment-scoped sponsor grant for this deployment' });
+            }
+        }
+
+        if (nextMode === 'public_sponsored' && !effectiveSponsorGrantId) {
+            return res.status(400).json({ success: false, error: 'Public sponsored deployments require a sponsor grant' });
+        }
+
+        const updated = DeploymentAccessPolicyRepository.upsert(req.dep.id, {
+            consumerAccessMode: req.body?.consumerAccessMode,
+            pinnedRevisionId: nextPinnedRevisionId,
+            sponsorGrantId: nextSponsorGrantId,
+            metadata: req.body?.metadata
+        });
+        const management = buildDeploymentManagementData({
+            ...req.dep,
+            id: updated.deployment_id
+        });
+        res.json({
+            success: true,
+            data: {
+                accessPolicy: management.accessPolicy,
+                runtimeHealth: management.runtimeHealth,
+                catalog: management.catalog
             }
         });
     } catch (err) {
@@ -233,11 +458,14 @@ router.get('/:slug/stats', authenticate, loadDeployment, requireDeploymentAction
         const stats = deploymentStatsService.getDeploymentStats(req.dep.id, {
             days: req.query.days
         });
+        const management = buildDeploymentManagementData(req.dep);
         res.json({
             success: true,
             data: {
                 deploymentId: req.dep.id,
                 slug: req.dep.slug,
+                accessPolicy: management.accessPolicy,
+                runtimeHealth: management.runtimeHealth,
                 ...stats
             }
         });
@@ -459,6 +687,15 @@ router.post('/:slug/chat', async (req, res) => {
             conversationId,
             embedSessionId: `rest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         });
+        const entitlement = catalogEntitlementService.resolveDeploymentEntitlement({
+            deployment: resolved.dep
+        });
+        if (!entitlement.allowed) {
+            return res.status(entitlement.reason === 'authentication_required' ? 401 : 403).json({
+                success: false,
+                error: entitlement.reason === 'quota_exhausted' ? 'Quota exceeded' : 'Deployment access denied'
+            });
+        }
         const result = await deploymentChatService.handleEmbedUserMessage({
             dep: resolved.dep,
             agent: resolved.agent,
@@ -466,7 +703,8 @@ router.post('/:slug/chat', async (req, res) => {
             embedSessionId: resolved.chat.embed_session_id || `rest-${resolved.chat.id}`,
             message,
             source: 'embed-rest',
-            emitToEmbed: true
+            emitToEmbed: true,
+            catalogEntitlement: entitlement
         });
         res.json({ success: true, data: result });
     } catch (err) {

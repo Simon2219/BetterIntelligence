@@ -5,8 +5,9 @@ const { generateId } = require('../core/ids');
 const _parseAgent = (row) => {
     if (!row) return null;
     const j = (v, d) => { try { return JSON.parse(v || 'null') ?? d; } catch { return d; } };
+    const { hub_published, ...rest } = row;
     return {
-        ...row,
+        ...rest,
         personality: j(row.personality, {}),
         behavior_rules: j(row.behavior_rules, {}),
         sample_dialogues: j(row.sample_dialogues, []),
@@ -50,17 +51,13 @@ const AIAgentRepository = {
         return all(sql, params).map(_parseAgent);
     },
 
-    listHubPublished(limit = 100) {
-        return all('SELECT * FROM ai_agents WHERE hub_published = 1 ORDER BY updated_at DESC LIMIT ?', [limit]).map(_parseAgent);
-    },
-
     update(id, updates) {
         const map = { userId: 'user_id', name: 'name', tagline: 'tagline', avatarUrl: 'avatar_url',
             personality: 'personality', backstory: 'backstory', behaviorRules: 'behavior_rules',
             sampleDialogues: 'sample_dialogues', systemPrompt: 'system_prompt',
             textProvider: 'text_provider', textModel: 'text_model', imageProvider: 'image_provider',
             imageModel: 'image_model', imagePromptStyle: 'image_prompt_style', temperature: 'temperature',
-            maxTokens: 'max_tokens', isActive: 'is_active', metadata: 'metadata', hubPublished: 'hub_published',
+            maxTokens: 'max_tokens', isActive: 'is_active', metadata: 'metadata',
             topP: 'top_p', topK: 'top_k', repeatPenalty: 'repeat_penalty',
             presencePenalty: 'presence_penalty', frequencyPenalty: 'frequency_penalty',
             stopSequences: 'stop_sequences', responseFormat: 'response_format',

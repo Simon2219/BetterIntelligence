@@ -8,8 +8,6 @@ export async function renderHubSkillsView({
 }) {
     try {
         const { data: skills } = await api('/hub/skills');
-        const { data: mySkills } = await api('/skills');
-        const installed = new Set((mySkills || []).filter((skill) => skill.source === 'installed').map((skill) => skill.slug || skill.name));
 
         container.innerHTML = `
             <div class="container">
@@ -24,7 +22,7 @@ export async function renderHubSkillsView({
                             <div class="card-title">${escapeHtml(skill.name)}</div>
                             <div class="card-meta">${escapeHtml(skill.description || '')}</div>
                             <div class="card-actions">
-                                ${installed.has(skill.slug || skill.name) ? '<span class="badge badge-ghost">Installed</span>' : `<button class="btn btn-primary btn-sm btn-install" data-slug="${skill.slug || skill.name}">Install</button>`}
+                                ${skill.isInstalled ? '<span class="badge badge-ghost">Installed</span>' : `<button class="btn btn-primary btn-sm btn-install" data-slug="${skill.slug || skill.name}">Install</button>`}
                             </div>
                         </div>
                     `).join('')}

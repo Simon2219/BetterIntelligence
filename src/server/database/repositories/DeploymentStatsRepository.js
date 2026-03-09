@@ -96,6 +96,26 @@ function getUsageTimeline(deploymentId, sinceIso) {
         ORDER BY day ASC`, [deploymentId, sinceIso]);
 }
 
+function getUsageCostRows(deploymentId, sinceIso) {
+    return all(`SELECT
+            e.provider_name,
+            e.model_id,
+            COUNT(*) AS requests,
+            SUM(COALESCE(e.prompt_tokens, 0)) AS prompt_tokens,
+            SUM(COALESCE(e.completion_tokens, 0)) AS completion_tokens,
+            SUM(COALESCE(e.total_tokens, 0)) AS total_tokens,
+            m.metadata AS metadata
+        FROM ai_model_usage_events e
+        JOIN chats c ON UPPER(c.id) = UPPER(e.chat_id)
+        LEFT JOIN ai_provider_models m
+          ON LOWER(m.provider_name) = LOWER(e.provider_name)
+         AND m.model_id = e.model_id
+        WHERE c.deployment_id = ?
+          AND e.created_at >= ?
+        GROUP BY e.provider_name, e.model_id, m.metadata
+        ORDER BY requests DESC`, [deploymentId, sinceIso]);
+}
+
 module.exports = {
     getOperationalCounts,
     getChatCounts,
@@ -104,5 +124,6 @@ module.exports = {
     getLatencyValues,
     getMessageTimeline,
     getChatTimeline,
-    getUsageTimeline
+    getUsageTimeline,
+    getUsageCostRows
 };
