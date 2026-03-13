@@ -386,7 +386,8 @@ function shapeAccData({
     dashboard = null,
     libraryPayload = {},
     currentUser = null,
-    locationSearch = ''
+    locationSearch = '',
+    panelMeasurements = {}
 } = {}) {
     const preferences = normalizeAccPrefs(currentUser?.settings?.accControlCenter || dashboard?.meta?.preferences);
     const finalViewState = applySavedView(parseBaseViewState(locationSearch, preferences), preferences);
@@ -451,6 +452,7 @@ function shapeAccData({
             : null,
         currentUser,
         preferences,
+        panelMeasurements,
         viewState: {
             ...finalViewState,
             availablePanels: getLibraryPanelKeys(finalViewState.activeTab)
@@ -481,7 +483,8 @@ function deriveAccData(baseData, {
     locationSearch = location.search,
     currentUser = null,
     dashboard = null,
-    libraryPayload = null
+    libraryPayload = null,
+    panelMeasurements = null
 } = {}) {
     const nextCurrentUser = currentUser || baseData?.currentUser || null;
     const nextDashboard = dashboard || baseData?.dashboard || null;
@@ -496,7 +499,8 @@ function deriveAccData(baseData, {
         dashboard: nextDashboard,
         libraryPayload: nextLibraryPayload,
         currentUser: nextCurrentUser,
-        locationSearch
+        locationSearch,
+        panelMeasurements: panelMeasurements || baseData?.panelMeasurements || {}
     });
 }
 
@@ -556,6 +560,7 @@ export function createAccView(deps) {
         currentData: null,
         currentSearch: '',
         lastVisitedAt: 0,
+        panelMeasurements: {},
         busy: false,
         debounceTimer: null,
         pendingCall: null
@@ -599,7 +604,7 @@ export function createAccView(deps) {
     function focusTargetPanel(container, panelKey) {
         const key = String(panelKey || '').trim();
         if (!key) return;
-        const target = container.querySelector(`.agents-panel[data-panel-key="${CSS.escape(key)}"], .agents-panel-dock__tile[data-panel-key="${CSS.escape(key)}"]`);
+        const target = container.querySelector(`.agents-panel[data-panel-key="${CSS.escape(key)}"]`);
         if (!target) return;
         requestAnimationFrame(() => {
             target.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -694,6 +699,16 @@ export function createAccView(deps) {
             }),
             applyLocalViewState: async (stateOpts = {}) => applyLocalViewState(container, stateOpts),
             saveAccPreferences,
+            panelMeasurements: accState.panelMeasurements,
+            setPanelMeasurements: (nextMeasurements = {}) => {
+                accState.panelMeasurements = {
+                    ...accState.panelMeasurements,
+                    ...nextMeasurements
+                };
+                if (accState.currentData) {
+                    accState.currentData.panelMeasurements = accState.panelMeasurements;
+                }
+            },
             renderAccCategoryManager: renderAccCategoryManagerModal
         });
 
@@ -779,7 +794,8 @@ export function createAccView(deps) {
             dashboard: accState.dashboard,
             libraryPayload: accState.libraryPayload || EMPTY_LIBRARY_PAYLOAD,
             currentUser,
-            locationSearch: search
+            locationSearch: search,
+            panelMeasurements: accState.panelMeasurements
         });
         return { data: accState.currentData, fetched };
     }

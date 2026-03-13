@@ -4,6 +4,7 @@ export function createRouterController({
     clearChatSocketListeners,
     renderNav,
     createChatForAgent,
+    getAuthenticatedDefaultRoute,
     viewRenderers
 } = {}) {
     const {
@@ -44,40 +45,58 @@ export function createRouterController({
         })();
         main.classList.remove('main--chat');
 
-        if (path === '/' || path === '') {
+        const url = new URL(path || '/', location.origin);
+        const pathname = url.pathname || '/';
+        const fullPath = `${pathname}${url.search}`;
+
+        const currentUser = state.getCurrentUser();
+        const authenticatedDefaultRoute = typeof getAuthenticatedDefaultRoute === 'function'
+            ? getAuthenticatedDefaultRoute(currentUser)
+            : '/agents';
+
+        if (currentUser && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
+            navigate(authenticatedDefaultRoute, { replace: true });
+            return;
+        }
+
+        if (currentUser && pathname === '/onboarding' && authenticatedDefaultRoute !== '/onboarding') {
+            navigate(authenticatedDefaultRoute, { replace: true });
+            return;
+        }
+
+        if (pathname === '/') {
             state.setCurrentView('landing');
             renderLandingView({
                 main,
                 isAuthenticated: !!state.getCurrentUser(),
                 navigate: (nextPath) => navigate(nextPath)
             });
-        } else if (path === '/login' || path === '/signup') {
+        } else if (pathname === '/login' || pathname === '/signup') {
             state.setCurrentView('auth');
-            renderAuth(main, path === '/signup');
-        } else if (path.match(/^\/agents\/[^/]+\/analytics/)) {
+            renderAuth(main, pathname === '/signup');
+        } else if (pathname.match(/^\/agents\/[^/]+\/analytics/)) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
             state.setCurrentView('analytics');
-            const agentId = path.split('/')[2];
+            const agentId = pathname.split('/')[2];
             await renderAnalytics(main, agentId);
-        } else if (path.match(/^\/agents\/[^/]+\/chat/)) {
+        } else if (pathname.match(/^\/agents\/[^/]+\/chat/)) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
-            const agentId = path.split('/')[2];
+            const agentId = pathname.split('/')[2];
             try { await createChatForAgent(agentId); } catch {}
             return;
-        } else if (path === '/chat' || path.startsWith('/chat/') || path.startsWith('/chat?')) {
+        } else if (pathname === '/chat' || pathname.startsWith('/chat/')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
             state.setCurrentView('chat');
             main.classList.add('main--chat');
-            const pathname = path.split('?')[0];
             const directNewMatch = pathname.match(/^\/chat\/new\/([^/]+)$/);
             if (pathname === '/chat/new') {
                 navigate('/chat', { replace: true });
@@ -88,7 +107,7 @@ export function createRouterController({
                 try { await createChatForAgent(routeAgentId, { replace: true }); } catch {}
                 return;
             }
-            const params = new URLSearchParams(path.includes('?') ? path.split('?')[1] : (location.search || ''));
+            const params = new URLSearchParams(url.search || '');
             const agentParam = params.get('agent');
             if (agentParam) {
                 try { await createChatForAgent(agentParam, { replace: true }); } catch {}
@@ -97,39 +116,39 @@ export function createRouterController({
             const pathParts = pathname.split('/').filter(Boolean);
             const chatId = pathParts[0] === 'chat' && pathParts[1] ? pathParts[1] : null;
             await renderChatHub(main, chatId);
-        } else if (path === '/agentBuilder' || path.startsWith('/agentBuilder/') || path.startsWith('/agentBuilder?')) {
+        } else if (pathname === '/agentBuilder' || pathname.startsWith('/agentBuilder/')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
             state.setCurrentView('agentBuilder');
-            await renderAgentBuilder(main, path);
-        } else if (path === '/agents' || path.startsWith('/agents?')) {
+            await renderAgentBuilder(main, fullPath);
+        } else if (pathname === '/agents') {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
             state.setCurrentView('agents');
-            await renderAcc(main, path);
-        } else if (path === '/skills' || path.startsWith('/skills')) {
+            await renderAcc(main, fullPath);
+        } else if (pathname === '/skills' || pathname.startsWith('/skills/')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
-            await renderSkills(main, path);
-        } else if (path === '/hub' || path.startsWith('/hub/')) {
+            await renderSkills(main, fullPath);
+        } else if (pathname === '/hub' || pathname.startsWith('/hub/')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
-            await renderHub(main, path);
-        } else if (path === '/settings') {
+            await renderHub(main, fullPath);
+        } else if (pathname === '/settings') {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
             await renderSettings(main);
-        } else if (path === '/admin') {
+        } else if (pathname === '/admin') {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
@@ -140,24 +159,24 @@ export function createRouterController({
                 return;
             }
             await renderAdmin(main);
-        } else if (path === '/onboarding') {
+        } else if (pathname === '/onboarding') {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
             await renderOnboarding(main);
-        } else if (path === '/deploy' || path.startsWith('/deploy')) {
+        } else if (pathname === '/deploy' || pathname.startsWith('/deploy/')) {
             if (!state.getCurrentUser()) {
                 navigate('/login');
                 return;
             }
-            await renderDeploy(main, path);
+            await renderDeploy(main, fullPath);
         } else {
             main.innerHTML = '<div class="container"><p class="text-muted">Not found</p></div>';
         }
 
         renderNav?.();
-        state.setLastRenderedPath(path);
+        state.setLastRenderedPath(fullPath);
     }
 
     return {

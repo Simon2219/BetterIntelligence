@@ -11,6 +11,11 @@ import {
     renderSparkline,
     renderTrendChart
 } from './accCharts.js';
+import {
+    buildAccPanelLayout,
+    getPanelSpan,
+    getPanelHeightUnits
+} from './accLayout.js';
 
 function renderIcon(name, size = 16) {
     return icon(name, size).outerHTML;
@@ -65,6 +70,17 @@ function renderToneChip(label, tone = 'default', iconName = '') {
             ${iconName ? `<span class="agents-state-chip__icon">${renderIcon(iconName, 14)}</span>` : ''}
             <span>${esc(label)}</span>
         </span>
+    `;
+}
+
+function renderRefreshStatus(lastUpdatedAt) {
+    const relative = formatRelativeDate(lastUpdatedAt);
+    return `
+        <button type="button" class="agents-control-refresh-status" id="agents-acc-refresh" aria-label="Refresh control center" title="Refresh control center">
+            <span class="agents-control-refresh-status__icon">${renderIcon('refreshCw', 16)}</span>
+            <span class="agents-control-refresh-status__text">Updated ${esc(relative)}</span>
+            <span class="agents-control-refresh-status__hover">Refresh now</span>
+        </button>
     `;
 }
 
@@ -141,174 +157,249 @@ function getOrderedPanels(panels, data) {
     });
 }
 
+function getPanelDestinationRoute(panel) {
+    const route = String(panel?.destinationRoute || '').trim();
+    if (!route) return '';
+    try {
+        const url = new URL(route, location.origin);
+        if (url.pathname === '/agents') return '';
+        return `${url.pathname}${url.search}`;
+    } catch {
+        return route.startsWith('/agents') ? '' : route;
+    }
+}
+
 function renderPanelCard(panel, data) {
     const collapsed = isCollapsed(data, panel.key);
     const pinned = isPinned(data, panel.key);
+    const span = getPanelSpan({
+        span: panel.span || (String(panel.className || '').includes('agents-panel--wide') ? 8 : 4)
+    });
     const title = panel.title || 'Panel';
     const subtitle = panel.subtitle ? `<p class="text-muted">${panel.subtitle}</p>` : '';
     const summary = panel.summary ? `<span class="agents-panel-summary">${panel.summary}</span>` : '';
+    const destinationRoute = getPanelDestinationRoute(panel);
+    const layoutItem = data.panelLayout?.byKey?.get(panel.key);
+    const style = layoutItem
+        ? `style="grid-column:${layoutItem.x + 1} / span ${layoutItem.w};grid-row:${layoutItem.y + 1} / span ${layoutItem.h};"`
+        : '';
     return `
-        <section class="card agents-panel ${panel.className || ''} ${pinned ? 'agents-panel--pinned' : ''} ${data.viewState.panelKey === panel.key ? 'agents-panel--targeted' : ''}" data-panel-key="${panel.key}" draggable="true">
-            <div class="agents-panel__header">
-                <div class="agents-panel__titles">
-                    <div class="agents-panel__title-row">
-                        <h3>${title}</h3>
-                        ${pinned ? renderToneChip('Pinned', 'accent', 'pin') : ''}
+        <section class="card agents-panel ${panel.className || ''} ${pinned ? 'agents-panel--pinned' : ''} ${collapsed ? 'agents-panel--collapsed' : ''} ${data.viewState.panelKey === panel.key ? 'agents-panel--targeted' : ''}" data-panel-key="${panel.key}" data-panel-pinned="${pinned ? 'true' : 'false'}" data-panel-span="${span}" data-panel-collapsed="${collapsed ? 'true' : 'false'}" data-panel-partition="${pinned ? 'pinned' : 'unpinned'}" ${style}>
+            <div class="agents-panel__header" data-acc-panel-drag-surface>
+                <div class="agents-panel__header-main">
+                    <span class="agents-panel__drag-cue" aria-hidden="true">${renderIcon('grip', 16)}</span>
+                    <div class="agents-panel__titles">
+                        <div class="agents-panel__title-row">
+                            <h3>${title}</h3>
+                            ${pinned ? `
+                                <button
+                                    type="button"
+                                    class="agents-panel-pin-pill"
+                                    data-acc-toggle-panel-pin="${panel.key}"
+                                    aria-label="Unpin panel"
+                                    title="Unpin panel"
+                                >
+                                    ${renderIcon('pin', 13)}
+                                    <span>Pinned</span>
+                                </button>
+                            ` : ''}
+                        </div>
+                        ${subtitle}
                     </div>
-                    ${subtitle}
                 </div>
-                <div class="agents-panel__actions">
-                    <span class="agents-panel__drag-handle" aria-hidden="true" title="Drag to rearrange">${renderIcon('panelTop', 15)}</span>
-                    ${panel.route ? `<a href="#" class="agents-icon-button" data-route="${escapeAttr(panel.route)}" aria-label="Open destination" title="Open destination">${renderIcon('externalLink', 15)}</a>` : ''}
-                    <button type="button" class="agents-icon-button" data-refresh-dashboard-panel="${panel.key}" aria-label="Refresh panel" title="Refresh panel">${renderIcon('refreshCw', 15)}</button>
-                    <button type="button" class="agents-icon-button" data-acc-panel-menu="${panel.key}" aria-label="Panel actions" title="Panel actions">${renderIcon('moreHorizontal', 16)}</button>
+                <div class="agents-panel__action-segment">
+                    <button
+                        type="button"
+                        class="agents-icon-button agents-panel__action-button"
+                        data-acc-toggle-panel-collapse="${panel.key}"
+                        aria-label="${collapsed ? 'Expand panel' : 'Collapse panel'}"
+                        title="${collapsed ? 'Expand panel' : 'Collapse panel'}"
+                    >${renderIcon(collapsed ? 'chevronDown' : 'chevronUp', 16)}</button>
+                    ${destinationRoute ? `<a href="#" class="agents-icon-button agents-panel__action-button" data-route="${escapeAttr(destinationRoute)}" aria-label="Open destination" title="Open destination">${renderIcon('externalLink', 15)}</a>` : ''}
+                    <button type="button" class="agents-icon-button agents-panel__action-button" data-acc-panel-menu="${panel.key}" aria-label="Panel actions" title="Panel actions">${renderIcon('moreHorizontal', 16)}</button>
                 </div>
             </div>
-            ${collapsed ? '' : `<div class="agents-panel__body">${panel.body}</div>`}
-            ${collapsed ? '' : summary}
+            <div class="agents-panel__content" aria-hidden="${collapsed ? 'true' : 'false'}" ${collapsed ? 'style="height:0px;"' : ''}>
+                <div class="agents-panel__content-inner">
+                    <div class="agents-panel__body">${panel.body}</div>
+                    ${summary}
+                </div>
+            </div>
         </section>
-    `;
-}
-
-function renderCollapsedPanelDock(collapsedPanels, data) {
-    if (!collapsedPanels.length) return '';
-    return `
-        <div class="agents-panel-dock">
-            ${collapsedPanels.map((panel) => `
-                <section class="card agents-panel-dock__tile ${isPinned(data, panel.key) ? 'agents-panel-dock__tile--pinned' : ''} ${data.viewState.panelKey === panel.key ? 'agents-panel-dock__tile--targeted' : ''}" data-panel-key="${panel.key}" draggable="true">
-                    <div class="agents-panel-dock__tile-main">
-                        <div class="agents-panel-dock__title-row">
-                            <strong>${panel.title}</strong>
-                            ${isPinned(data, panel.key) ? renderIcon('pin', 14) : ''}
-                        </div>
-                        ${panel.summary ? `<span class="agents-panel-dock__summary">${panel.summary}</span>` : ''}
-                    </div>
-                    <div class="agents-panel-dock__actions">
-                        <span class="agents-panel__drag-handle agents-panel__drag-handle--dock" aria-hidden="true" title="Drag to rearrange">${renderIcon('panelTop', 14)}</span>
-                        ${panel.route ? `<a href="#" class="agents-icon-button agents-icon-button--dock" data-route="${escapeAttr(panel.route)}" aria-label="Open destination" title="Open destination">${renderIcon('externalLink', 14)}</a>` : ''}
-                        <button type="button" class="agents-icon-button agents-icon-button--dock" data-acc-collapse-panel="${panel.key}" aria-label="Expand panel" title="Expand panel">${renderIcon('chevronDown', 14)}</button>
-                    </div>
-                </section>
-            `).join('')}
-        </div>
     `;
 }
 
 function renderPanelLayout(panels, data) {
     const ordered = getOrderedPanels(panels, data);
-    const collapsedPanels = ordered.filter((panel) => isCollapsed(data, panel.key));
-    const expandedPanels = ordered.filter((panel) => !isCollapsed(data, panel.key));
+    const measurements = data.panelMeasurements || {};
+    const specs = ordered.map((panel) => ({
+        key: panel.key,
+        span: panel.span || (String(panel.className || '').includes('agents-panel--wide') ? 8 : 4),
+        collapsed: isCollapsed(data, panel.key),
+        partition: isPinned(data, panel.key) ? 'pinned' : 'unpinned',
+        measurements,
+        estimatedHeightUnits: getPanelHeightUnits({
+            key: panel.key,
+            span: panel.span || (String(panel.className || '').includes('agents-panel--wide') ? 8 : 4),
+            collapsed: isCollapsed(data, panel.key)
+        }, measurements)
+    }));
+    const panelLayout = buildAccPanelLayout(specs);
+    data.panelLayout = panelLayout;
     return `
-        ${renderCollapsedPanelDock(collapsedPanels, data)}
-        <div class="agents-dashboard-grid">
-            ${expandedPanels.map((panel) => renderPanelCard(panel, data)).join('')}
+        <div class="agents-dashboard-grid" style="--agents-grid-total-rows:${panelLayout.totalRows};">
+            ${ordered.map((panel) => renderPanelCard(panel, data)).join('')}
         </div>
     `;
 }
 
 function renderTabNav(activeTab, escapeHtml) {
+    const tabs = [
+        ['overview', 'Overview', 'layoutGrid'],
+        ['library', 'Library', 'folder'],
+        ['access', 'Access', 'shield'],
+        ['listings', 'Listings', 'layers'],
+        ['reviews', 'Reviews', 'clipboardList'],
+        ['usage', 'Usage', 'activity']
+    ];
     return `
-        <div class="agents-control-tabs" role="tablist" aria-label="Agent Control Center sections">
-            ${[['overview', 'Overview'], ['library', 'Library'], ['access', 'Access'], ['listings', 'Listings'], ['reviews', 'Reviews'], ['usage', 'Usage']].map(([tab, label]) => `
-                <button type="button" class="agents-control-tab ${activeTab === tab ? 'agents-control-tab--active' : ''}" data-agents-tab="${escapeHtml(tab)}" role="tab" aria-selected="${activeTab === tab ? 'true' : 'false'}">${escapeHtml(label)}</button>
-            `).join('')}
+        <div class="agents-control-tab-rail" role="tablist" aria-label="Agent Control Center sections">
+              ${tabs.map(([tab, label, iconName]) => `
+                  <button
+                      type="button"
+                      class="agents-control-tab ${activeTab === tab ? 'agents-control-tab--active' : ''}"
+                      data-agents-tab="${escapeHtml(tab)}"
+                      data-tab-style="${escapeHtml(tab)}"
+                      role="tab"
+                      aria-label="${escapeAttr(label)}"
+                      aria-selected="${activeTab === tab ? 'true' : 'false'}"
+                      title="${escapeAttr(label)}"
+                  >
+                      <span class="agents-control-tab__icon">${renderIcon(iconName, 19)}</span>
+                      <span class="agents-control-tab__label">${escapeHtml(label)}</span>
+                  </button>
+              `).join('')}
         </div>
     `;
 }
 
-function renderSavedViewSummary(data) {
+function renderSavedViewControl(data) {
     const prefs = getPrefs(data);
     const savedViews = prefs.savedViews || [];
     const currentSavedViewId = data.viewState.savedViewId;
     const current = savedViews.find((view) => view.id === currentSavedViewId);
     return `
-        <div class="agents-control-header__saved-view">
-            <button type="button" class="btn btn-ghost" id="agents-acc-open-saved-views">${renderIcon('star', 14)}<span>${current ? current.name : 'Saved Views'}</span></button>
-            <button type="button" class="btn btn-ghost" id="agents-acc-save-view">${renderIcon('copy', 14)}<span>Save Current View</span></button>
-        </div>
+        <button type="button" class="agents-control-utility-button agents-control-utility-button--saved" id="agents-acc-saved-views-menu" aria-label="Saved views" title="Saved views">
+            ${renderIcon('star', 15)}
+            <span>${esc(current ? current.name : 'Saved Views')}</span>
+            ${renderIcon('chevronDown', 14)}
+        </button>
     `;
 }
 
-function renderHeader(data, escapeHtml) {
-    const meta = data.dashboard?.meta || {};
-    return `
-        <div class="agents-control-header">
-            <div class="agents-control-header__intro">
-                <div class="agents-control-eyebrow">Creator cockpit</div>
-                <h1 class="agents-control-title">Agent Control Center</h1>
-                <p class="text-muted">See what changed, what needs attention, and what to do next across your agents, listings, access, and hosted usage.</p>
-                <div class="agents-control-header__meta">
-                    <span>${renderIcon('panelTop', 14)} Updated ${escapeHtml(formatRelativeDate(meta.lastUpdatedAt))}</span>
-                    <span>${renderIcon('sparkles', 14)} ${escapeHtml(String(meta.days || data.viewState.days || 30))}d window</span>
-                    <span>${renderIcon('info', 14)} ${escapeHtml(data.viewState.activeTab)} active</span>
-                </div>
-            </div>
-            <div class="agents-control-header__actions">
-                <a href="#" class="btn btn-primary" data-route="/agentBuilder">Create Agent</a>
-                <a href="#" class="btn btn-ghost" data-route="/skills">Open Skills</a>
-                <a href="#" class="btn btn-ghost" data-route="/deploy">Open Deploy</a>
-                <a href="#" class="btn btn-ghost" data-route="/hub">Browse Hub</a>
-                ${renderSavedViewSummary(data)}
-                <button type="button" class="btn btn-ghost" id="agents-acc-copy-link">${renderIcon('copy', 14)}<span>Copy Link</span></button>
-                <button type="button" class="btn btn-ghost" id="agents-acc-refresh">${renderIcon('refreshCw', 14)}<span>Refresh</span></button>
-            </div>
-        </div>
-    `;
-}
-
-function renderToolbar(viewState, data, escapeHtml) {
-    const headerSearchPlaceholder = viewState.activeTab === 'library'
+function renderHeaderSearchPlaceholder(viewState) {
+    return viewState.activeTab === 'library'
         ? 'Search agents, tags, providers...'
         : viewState.activeTab === 'usage'
             ? 'Search models, providers, assets...'
             : 'Search this tab...';
+}
 
-    const toolbarExtras = viewState.activeTab === 'library' ? `
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="sort">
-            ${[['updated', 'Recently updated'], ['usage', 'Most used'], ['name', 'Name'], ['health', 'Health'], ['listing', 'Listing state']].map(([value, label]) => `<option value="${value}" ${viewState.sort === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="group">
-            ${[['category', 'Group: Category'], ['listing', 'Group: Listing'], ['health', 'Group: Health'], ['provider', 'Group: Provider']].map(([value, label]) => `<option value="${value}" ${viewState.group === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="view">
-            ${[['cards', 'Cards'], ['list', 'Compact list']].map(([value, label]) => `<option value="${value}" ${viewState.view === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-        <button type="button" class="btn btn-ghost btn-sm" data-acc-open-panel-customize>${renderIcon('settings', 14)}<span>Panels</span></button>
-    ` : viewState.activeTab === 'access' ? `
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="sort">
-            ${[['urgency', 'Urgency'], ['newest', 'Newest'], ['oldest', 'Oldest']].map(([value, label]) => `<option value="${value}" ${viewState.sort === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="source">
-            ${[['', 'All sources'], ['manual', 'Manual'], ['legacy_subscription', 'Legacy'], ['access_request', 'Requests'], ['bundle_grant', 'Bundle']].map(([value, label]) => `<option value="${value}" ${viewState.source === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-    ` : viewState.activeTab === 'listings' || viewState.activeTab === 'reviews' ? `
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="status">
-            ${[['', 'All statuses'], ['draft', 'Draft'], ['pending_review', 'Pending'], ['approved', 'Approved'], ['published', 'Published'], ['rejected', 'Rejected'], ['suspended', 'Suspended']].map(([value, label]) => `<option value="${value}" ${viewState.status === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-    ` : viewState.activeTab === 'usage' ? `
-        <div class="agents-segmented-control" role="group" aria-label="Usage metric">
-            ${[['requests', 'Requests'], ['tokens', 'Tokens'], ['cost', 'Hosted Cost']].map(([value, label]) => `
-                <button type="button" class="agents-segmented-control__button ${viewState.metric === value ? 'agents-segmented-control__button--active' : ''}" data-acc-metric="${value}">${label}</button>
-            `).join('')}
-        </div>
-        <select class="form-input form-input--sm ui-select-compact" data-acc-param="group">
-            ${[['provider', 'Group: Provider'], ['model', 'Group: Model'], ['asset', 'Group: Asset']].map(([value, label]) => `<option value="${value}" ${viewState.group === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-    ` : `
-        <button type="button" class="btn btn-ghost btn-sm" data-acc-open-panel-customize>${renderIcon('settings', 14)}<span>Panels</span></button>
-    `;
+function renderContextControls(viewState) {
+    if (viewState.activeTab === 'library') {
+        return `
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="sort">
+                ${[['updated', 'Recently updated'], ['usage', 'Most used'], ['name', 'Name'], ['health', 'Health'], ['listing', 'Listing state']].map(([value, label]) => `<option value="${value}" ${viewState.sort === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="group">
+                ${[['category', 'Group: Category'], ['listing', 'Group: Listing'], ['health', 'Group: Health'], ['provider', 'Group: Provider']].map(([value, label]) => `<option value="${value}" ${viewState.group === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="view">
+                ${[['cards', 'Cards'], ['list', 'Compact list']].map(([value, label]) => `<option value="${value}" ${viewState.view === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+        `;
+    }
 
+    if (viewState.activeTab === 'access') {
+        return `
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="sort">
+                ${[['urgency', 'Urgency'], ['newest', 'Newest'], ['oldest', 'Oldest']].map(([value, label]) => `<option value="${value}" ${viewState.sort === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="source">
+                ${[['', 'All sources'], ['manual', 'Manual'], ['legacy_subscription', 'Legacy'], ['access_request', 'Requests'], ['bundle_grant', 'Bundle']].map(([value, label]) => `<option value="${value}" ${viewState.source === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+        `;
+    }
+
+    if (viewState.activeTab === 'listings' || viewState.activeTab === 'reviews') {
+        return `
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="status">
+                ${[['', 'All statuses'], ['draft', 'Draft'], ['pending_review', 'Pending'], ['approved', 'Approved'], ['published', 'Published'], ['rejected', 'Rejected'], ['suspended', 'Suspended']].map(([value, label]) => `<option value="${value}" ${viewState.status === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+        `;
+    }
+
+    if (viewState.activeTab === 'usage') {
+        return `
+            <div class="agents-segmented-control" role="group" aria-label="Usage metric">
+                ${[['requests', 'Requests'], ['tokens', 'Tokens'], ['cost', 'Hosted Cost']].map(([value, label]) => `
+                    <button type="button" class="agents-segmented-control__button ${viewState.metric === value ? 'agents-segmented-control__button--active' : ''}" data-acc-metric="${value}">${label}</button>
+                `).join('')}
+            </div>
+            <select class="form-input form-input--sm ui-select-compact" data-acc-param="group">
+                ${[['provider', 'Group: Provider'], ['model', 'Group: Model'], ['asset', 'Group: Asset']].map(([value, label]) => `<option value="${value}" ${viewState.group === value ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+        `;
+    }
+
+    return '';
+}
+
+function renderTimeframeSelect(viewState) {
     return `
-        <div class="agents-control-toolbar">
-            <form class="agents-control-toolbar__search" id="agents-acc-search-form">
-                <input id="agents-acc-search-input" class="form-input form-input--sm" type="search" value="${escapeHtml(viewState.q)}" placeholder="${escapeHtml(headerSearchPlaceholder)}">
-                <button type="submit" class="btn btn-ghost btn-sm" title="Search">${renderIcon('search', 14)}<span>Search</span></button>
-            </form>
-            <div class="agents-control-toolbar__actions">
-                <select class="form-input form-input--sm ui-select-compact" data-acc-param="days">
-                    ${[7, 30, 90].map((days) => `<option value="${days}" ${viewState.days === days ? 'selected' : ''}>${days}d</option>`).join('')}
-                </select>
-                ${toolbarExtras}
+        <label class="agents-control-select-shell agents-control-select-shell--timeframe">
+            <span class="agents-control-select-shell__label">Window</span>
+            <select class="form-input form-input--sm agents-control-select-shell__select" data-acc-param="days" aria-label="Timeframe">
+                ${[7, 30, 90].map((days) => `<option value="${days}" ${viewState.days === days ? 'selected' : ''}>${days}d</option>`).join('')}
+            </select>
+            <span class="agents-control-select-shell__icon">${renderIcon('chevronDown', 14)}</span>
+        </label>
+    `;
+}
+
+function renderTopBar(data, escapeHtml) {
+    const meta = data.dashboard?.meta || {};
+    const viewState = data.viewState;
+    const contextControls = renderContextControls(viewState);
+    return `
+        <div class="agents-control-header">
+            <div class="agents-control-header__top">
+                <div class="agents-control-header__title-block">
+                    <h1 class="agents-control-title">Agent Control Center</h1>
+                    <p class="agents-control-description">Operate agents, listings, access, and usage from one place.</p>
+                </div>
+                <div class="agents-control-header__controls">
+                    ${renderSavedViewControl(data)}
+                    <button type="button" class="agents-control-utility-button" data-acc-open-panel-customize aria-label="Panel options" title="Panel options">
+                        ${renderIcon('sliders', 15)}
+                        <span>Panels</span>
+                    </button>
+                    ${renderRefreshStatus(meta.lastUpdatedAt)}
+                    <form class="agents-control-search" id="agents-acc-search-form">
+                        <input id="agents-acc-search-input" class="form-input form-input--sm agents-control-search__input" type="search" value="${escapeHtml(viewState.q)}" placeholder="${escapeHtml(renderHeaderSearchPlaceholder(viewState))}">
+                        <button type="submit" class="agents-control-search__submit" aria-label="Search" title="Search">${renderIcon('search', 16)}</button>
+                    </form>
+                    ${renderTimeframeSelect(viewState)}
+                    <a href="#" class="btn btn-primary agents-control-header__create" data-route="/agentBuilder">Create Agent</a>
+                </div>
+            </div>
+            <div class="agents-control-header__context">
+                <div class="agents-control-header__context-slot">
+                    ${contextControls || '<div class="agents-control-header__context-empty" aria-hidden="true"></div>'}
+                </div>
+            </div>
+            <div class="agents-control-header__menu-slot">
+                ${renderTabNav(viewState.activeTab, escapeHtml)}
             </div>
         </div>
     `;
@@ -419,7 +510,7 @@ function renderOverviewTab(data, escapeHtml) {
             key: 'overview-kpis',
             title: 'Snapshot',
             summary: `${Object.keys(overview.kpis || {}).length} cards`,
-            route: overview.panelRoutes?.kpis || '/agents?tab=overview',
+            panelRoute: overview.panelRoutes?.kpis || '/agents?tab=overview',
             body: renderKpiCards(overview.kpis || {})
         },
         {
@@ -428,7 +519,7 @@ function renderOverviewTab(data, escapeHtml) {
             subtitle: usageCompare.label ? `${usageCompare.label}: ${usageCompare.direction === 'down' ? '' : '+'}${usageCompare.formattedDelta || '0'}` : 'Requests, tokens, and hosted cost',
             summary: usageCompare.currentFormatted,
             className: 'agents-panel--wide',
-            route: overview.panelRoutes?.trend || '/agents?tab=usage',
+            panelRoute: overview.panelRoutes?.trend || '/agents?tab=usage',
             body: `
                 <div class="agents-chart-shell">
                     <div class="agents-chart-shell__toolbar">
@@ -451,7 +542,7 @@ function renderOverviewTab(data, escapeHtml) {
             title: 'Attention Rail',
             subtitle: 'Urgent items across usage, review, and runtime health.',
             summary: `${formatInteger((overview.alerts || []).length)} alerts`,
-            route: overview.panelRoutes?.alerts || '/agents?tab=overview',
+            panelRoute: overview.panelRoutes?.alerts || '/agents?tab=overview',
             body: renderAlertList(overview.alerts || [])
         },
         {
@@ -459,7 +550,7 @@ function renderOverviewTab(data, escapeHtml) {
             title: 'Recent Activity',
             subtitle: 'What changed since your last visit.',
             summary: `${formatInteger((overview.recentActivity || []).length)} recent items`,
-            route: overview.panelRoutes?.recent || '/agents?tab=overview',
+            panelRoute: overview.panelRoutes?.recent || '/agents?tab=overview',
             body: `<div class="agents-feed-list">${renderRecentItems(overview.recentActivity || [], data)}</div>`
         },
         {
@@ -467,7 +558,7 @@ function renderOverviewTab(data, escapeHtml) {
             title: 'Highlights',
             subtitle: 'Fast movers, cost spikes, and assets needing action.',
             summary: 'Performance and attention',
-            route: overview.panelRoutes?.highlights || '/agents?tab=overview',
+            panelRoute: overview.panelRoutes?.highlights || '/agents?tab=overview',
             className: 'agents-panel--wide',
             body: renderSpotlights(overview.spotlights || {})
         },
@@ -476,7 +567,7 @@ function renderOverviewTab(data, escapeHtml) {
             title: 'Federated Summary',
             subtitle: 'Jump into related workflow hubs without duplicating them here.',
             summary: 'Deploy, Skills, Hub',
-            route: overview.panelRoutes?.federation || '/agents?tab=overview',
+            panelRoute: overview.panelRoutes?.federation || '/agents?tab=overview',
             body: `
                 <div class="agents-cross-grid">
                     ${renderCrossSurfaceCard(
@@ -1095,11 +1186,9 @@ export function renderAccView({ data, escapeHtml, getAgentAvatarUrl } = {}) {
                         : renderUsageTab(data, escapeHtml);
 
     return `
-        <div class="container">
+        <div class="container agents-control-frame">
             <div class="agents-control-shell">
-                ${renderHeader(data, escapeHtml)}
-                ${renderTabNav(data.viewState.activeTab, escapeHtml)}
-                ${renderToolbar(data.viewState, data, escapeHtml)}
+                ${renderTopBar(data, escapeHtml)}
                 ${tabBody}
             </div>
         </div>

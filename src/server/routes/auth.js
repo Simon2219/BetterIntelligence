@@ -57,7 +57,10 @@ router.post('/signup', async (req, res) => {
             displayName: displayName.trim(),
             passwordHash: hash,
             roleId: 1,
-            settings: { theme: 'dark' }
+            settings: {
+                theme: 'dark',
+                onboardingCompleted: false
+            }
         });
 
         const user = UserRepository.getByEmail(email);

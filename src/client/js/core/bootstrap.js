@@ -227,6 +227,10 @@ const authSession = createAuthSession({
 // Auth session methods consumed by bootstrap lifecycle and settings view.
 const { checkSession, logout } = authSession;
 
+function getAuthenticatedDefaultRoute(user = state.getCurrentUser()) {
+    return user?.settings?.onboardingCompleted === false ? '/onboarding' : '/agents';
+}
+
 /*
 |--------------------------------------------------------------------------
 | Subsystem: Chat Route Lifecycle
@@ -281,7 +285,8 @@ const { renderAuth } = createAuthView({
     navigate: navigateProxy,
     showToast,
     setCurrentUser,
-    escapeHtml
+    escapeHtml,
+    getAuthenticatedDefaultRoute
 });
 
 // ACC rendering function.
@@ -409,7 +414,10 @@ const { renderOnboarding } = createOnboardingView({
     api,
     showToast,
     navigate: navigateProxy,
-    escapeHtml
+    escapeHtml,
+    getCurrentUser,
+    setCurrentUser,
+    getAuthenticatedDefaultRoute
 });
 
 /*
@@ -449,6 +457,7 @@ const routerController = createRouterController({
     clearChatSocketListeners,
     renderNav: renderMainAppView,
     createChatForAgent,
+    getAuthenticatedDefaultRoute,
     viewRenderers: {
         renderLandingView,
         renderAuth,

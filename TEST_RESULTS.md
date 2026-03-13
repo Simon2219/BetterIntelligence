@@ -1,10 +1,10 @@
 # BetterIntelligence API Test Results
 
-Run: 2026-03-01T22:55:24.122Z
+Run: 2026-03-12T21:49:44.047Z
 
-Base URL: http://localhost:3001
+Base URL: https://localhost:3001
 
-**Summary:** 52 passed, 0 failed, 52 total
+**Summary:** 71 passed, 0 failed, 71 total
 
 | Test | Status |
 |------|--------|
@@ -45,9 +45,28 @@ Base URL: http://localhost:3001
 | Deploy: Hooks delete | ✓ PASS |
 | Deploy: Chat | ✓ PASS |
 | Deploy: Chat no message | ✓ PASS |
+| Auth: Admin login | ✓ PASS |
+| Auth: Consumer signup | ✓ PASS |
 | Hub: List skills | ✓ PASS |
-| Hub: Publish | ✓ PASS |
-| Hub: Install | ✓ PASS |
+| Hub: List agents | ✓ PASS |
+| Agents legacy hub route removed | ✓ PASS |
+| Catalog: Create skill listing | ✓ PASS |
+| Catalog: Submit skill listing | ✓ PASS |
+| Catalog: Approve skill listing | ✓ PASS |
+| Catalog: Create agent listing | ✓ PASS |
+| Catalog: Submit agent listing | ✓ PASS |
+| Catalog: Approve agent listing | ✓ PASS |
+| Hub: Public agent detail sanitized | ✓ PASS |
+| Catalog: Public agent requires grant for chat | ✓ PASS |
+| Hub: Subscribe agent grant created | ✓ PASS |
+| Catalog: Agent entitlement resolves after subscribe | ✓ PASS |
+| Catalog: Grant lineage exposed | ✓ PASS |
+| Catalog: Grant usage endpoint | ✓ PASS |
+| Catalog: Asset usage attribution endpoint | ✓ PASS |
+| Hub: Public skill detail sanitized | ✓ PASS |
+| Catalog: Public skill requires grant for install | ✓ PASS |
+| Hub: Install approved skill | ✓ PASS |
+| Catalog: Skill entitlement resolves after install grant | ✓ PASS |
 | AI: Status | ✓ PASS |
 | AI: Providers | ✓ PASS |
 | AI: Models | ✓ PASS |

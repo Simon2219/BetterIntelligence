@@ -188,7 +188,7 @@ function runRemaining() {
   else fail('3-3', 'Section styling');
   if (appJs.includes('New Skills') && appJs.includes('Popular Agents')) pass('3-4', 'Layout sections');
   else fail('3-4', 'Missing section headings');
-  if (!appJs.includes('/agents/hub') && appJs.includes("path === '/hub' || path.startsWith('/hub/')"))
+  if (!appJs.includes('/agents/hub') && (appJs.includes("pathname === '/hub' || pathname.startsWith('/hub/')") || appJs.includes("path === '/hub' || path.startsWith('/hub/')")))
     pass('3-5', 'Hub route owns navigation without legacy /agents/hub redirect');
   else fail('3-5', 'Legacy /agents/hub redirect still present or Hub route missing');
   pass('3-6', 'Integration (manual verify install)');

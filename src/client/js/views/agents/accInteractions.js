@@ -1,7 +1,19 @@
 import { openAccMenu, openAccModal } from './accOverlays.js';
 import { formatInteger, formatRelativeDate } from './accCharts.js';
+import { icon } from '../../utils/dom.js';
+import {
+    buildAccPanelLayout,
+    getColumnStarts,
+    getGridMetrics,
+    getPanelHeightUnits,
+    getPanelSpan,
+    layoutItemToPixels,
+    measurePanelHeights
+} from './accLayout.js';
 
-const PANEL_DRAG_TYPE = 'application/x-acc-panel';
+const SUPPORTS_SCROLL_TIMELINE =
+    typeof CSS !== 'undefined' && CSS.supports?.('animation-timeline', 'scroll()');
+
 const AGENT_DRAG_TYPE = 'text/plain';
 const ACC_QUERY_KEYS = [
     'tab',
@@ -29,10 +41,6 @@ async function persistPreference(saveAccPreferences, patch = {}) {
     } catch {}
 }
 
-function getSearchState() {
-    return new URL(location.href);
-}
-
 function togglePreferenceValue(list = [], value) {
     const set = new Set(Array.isArray(list) ? list.map((item) => String(item)) : []);
     const normalized = String(value || '');
@@ -47,18 +55,6 @@ function ensureWidgetOrder(widgetOrder = [], key, { moveToFront = false } = {}) 
     const filtered = ordered.filter((item) => item !== String(key));
     if (moveToFront) return [String(key), ...filtered];
     return [...filtered, String(key)];
-}
-
-function moveItem(list = [], key, targetKey, placeAfter = false) {
-    const items = [...list];
-    const fromIndex = items.indexOf(String(key));
-    const targetIndex = items.indexOf(String(targetKey));
-    if (fromIndex === -1 || targetIndex === -1 || fromIndex === targetIndex) return items;
-    const [moved] = items.splice(fromIndex, 1);
-    const baseIndex = items.indexOf(String(targetKey));
-    const insertIndex = placeAfter ? baseIndex + 1 : baseIndex;
-    items.splice(insertIndex, 0, moved);
-    return items;
 }
 
 function slugifyName(value) {
@@ -82,24 +78,256 @@ function buildCurrentViewQuery() {
 
 function getPanelTitle(container, key) {
     const panel = container.querySelector(`.agents-panel[data-panel-key="${CSS.escape(key)}"] h3`);
-    if (panel?.textContent?.trim()) return panel.textContent.trim();
-    const dockTile = container.querySelector(`.agents-panel-dock__tile[data-panel-key="${CSS.escape(key)}"] strong`);
-    return dockTile?.textContent?.trim() || key;
+    return panel?.textContent?.trim() || key;
 }
 
 function getVisiblePanelKeys(container) {
     const seen = new Set();
-    return [...container.querySelectorAll('.agents-panel-dock__tile[data-panel-key], .agents-panel[data-panel-key]')]
+    return [...container.querySelectorAll('.agents-panel[data-panel-key]')]
         .map((element) => String(element.dataset.panelKey || '').trim())
         .filter((key) => key && !seen.has(key) && seen.add(key));
 }
 
-function buildWidgetOrder(data, visibleKeys = [], nextVisibleKeys = visibleKeys) {
-    const existing = Array.isArray(data.preferences?.widgetOrder) ? data.preferences.widgetOrder.map((item) => String(item)) : [];
-    const orderedVisible = nextVisibleKeys.map((item) => String(item));
-    const visibleSet = new Set(visibleKeys.map((item) => String(item)));
-    const rest = existing.filter((item) => !visibleSet.has(item) && !orderedVisible.includes(item));
-    return [...orderedVisible, ...rest];
+function getPanelElement(container, key) {
+    return container.querySelector(`.agents-panel[data-panel-key="${CSS.escape(String(key || '').trim())}"]`);
+}
+
+function setPanelContentHeight(panel, collapsed, { animate = true } = {}) {
+    const content = panel?.querySelector('.agents-panel__content');
+    const inner = panel?.querySelector('.agents-panel__content-inner');
+    if (!content || !inner) return;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const nextHeight = collapsed ? 0 : inner.scrollHeight;
+
+    if (!animate || reducedMotion) {
+        content.style.height = collapsed ? '0px' : 'auto';
+        content.style.opacity = collapsed ? '0' : '1';
+        panel.classList.remove('agents-panel--collapsing');
+        return;
+    }
+
+    const startingHeight = collapsed
+        ? (content.offsetHeight || inner.scrollHeight)
+        : content.offsetHeight;
+
+    panel.classList.add('agents-panel--collapsing');
+    content.style.height = `${startingHeight}px`;
+    content.style.opacity = collapsed ? '1' : '0';
+
+    const finish = () => {
+        panel.classList.remove('agents-panel--collapsing');
+        content.style.height = collapsed ? '0px' : 'auto';
+        content.style.opacity = collapsed ? '0' : '1';
+        content.removeEventListener('transitionend', finish);
+    };
+
+    content.addEventListener('transitionend', finish);
+
+    requestAnimationFrame(() => {
+        content.style.height = `${nextHeight}px`;
+        content.style.opacity = collapsed ? '0' : '1';
+    });
+}
+
+function getScrollParent(element) {
+    let current = element?.parentElement || null;
+    while (current && current !== document.body) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY || style.overflow || '';
+        if (/(auto|scroll|overlay)/.test(overflowY) && current.scrollHeight > current.clientHeight + 1) {
+            return current;
+        }
+        current = current.parentElement;
+    }
+    return window;
+}
+
+function getScrollTopForTarget(target) {
+    return target === window ? window.scrollY : target.scrollTop;
+}
+
+function getTopWithinScrollTarget(element, scrollTarget) {
+    const rect = element.getBoundingClientRect();
+    if (scrollTarget === window) {
+        return rect.top + window.scrollY;
+    }
+    const targetRect = scrollTarget.getBoundingClientRect();
+    return rect.top - targetRect.top + scrollTarget.scrollTop;
+}
+
+function bindStickyHeaderTuckIn(container) {
+    const header = container?.querySelector('.agents-control-header');
+    const menuSlot = header?.querySelector('.agents-control-header__menu-slot');
+    const tabRail = header?.querySelector('.agents-control-tab-rail');
+    if (!header || !menuSlot || !tabRail) {
+        return { cleanup() {} };
+    }
+
+    const sentinel = document.createElement('span');
+    sentinel.setAttribute('aria-hidden', 'true');
+    const shell = header.closest('.agents-control-shell');
+    const frame = shell?.parentElement;
+    if (frame && frame !== shell) {
+        frame.insertBefore(sentinel, shell);
+    } else {
+        header.parentNode?.insertBefore(sentinel, header);
+    }
+
+    const isSingleRowRail = () => {
+        const buttons = [...tabRail.querySelectorAll('.agents-control-tab')];
+        if (!buttons.length) return false;
+        const firstTop = Math.round(buttons[0].offsetTop);
+        return buttons.every((button) => Math.abs(Math.round(button.offsetTop) - firstTop) <= 1);
+    };
+
+    if (SUPPORTS_SCROLL_TIMELINE) {
+        sentinel.className = 'agents-scroll-sentinel';
+
+        const measure = () => {
+            header.classList.toggle('agents-control-header--no-tuck', !isSingleRowRail());
+            const buttons = [...tabRail.querySelectorAll('.agents-control-tab')];
+            const tabHeight = buttons[0]?.getBoundingClientRect().height || 0;
+            const travel = Math.max(80, Math.round(tabHeight * 1.05));
+            sentinel.style.height = `${travel}px`;
+            sentinel.style.marginBottom = `-${travel}px`;
+        };
+
+        const resizeObserver = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(() => measure())
+            : null;
+        resizeObserver?.observe(tabRail);
+        window.addEventListener('resize', measure);
+        measure();
+
+        return {
+            cleanup() {
+                resizeObserver?.disconnect();
+                window.removeEventListener('resize', measure);
+                header.classList.remove('agents-control-header--no-tuck');
+                sentinel.remove();
+            }
+        };
+    }
+
+    sentinel.style.cssText = 'display:block;height:0;width:0;pointer-events:none;visibility:hidden;';
+
+    const state = {
+        startY: 0,
+        travel: 96,
+        enabled: false,
+        rafId: 0,
+        scrollTarget: getScrollParent(header)
+    };
+
+    function getStickyTop() {
+        const top = parseFloat(window.getComputedStyle(header).top || '0');
+        return Number.isFinite(top) ? top : 0;
+    }
+
+    function applyProgress(nextProgress) {
+        const progress = Math.max(0, Math.min(1, nextProgress));
+        header.style.setProperty('--agents-sticky-progress', progress.toFixed(4));
+        header.classList.toggle('agents-control-header--stuck', progress > 0.001);
+    }
+
+    function updateProgress() {
+        state.rafId = 0;
+        if (!state.enabled) {
+            applyProgress(0);
+            return;
+        }
+        const progress = (getScrollTopForTarget(state.scrollTarget) - state.startY) / state.travel;
+        applyProgress(progress);
+    }
+
+    function queueProgressUpdate() {
+        if (state.rafId) return;
+        state.rafId = window.requestAnimationFrame(updateProgress);
+    }
+
+    function measure() {
+        const buttons = [...tabRail.querySelectorAll('.agents-control-tab')];
+        const nextScrollTarget = getScrollParent(header);
+        if (nextScrollTarget !== state.scrollTarget) {
+            state.scrollTarget.removeEventListener('scroll', queueProgressUpdate);
+            state.scrollTarget = nextScrollTarget;
+            state.scrollTarget.addEventListener('scroll', queueProgressUpdate, { passive: true });
+        }
+        state.enabled = isSingleRowRail();
+        if (!state.enabled) {
+            applyProgress(0);
+            return;
+        }
+
+        const stickyTop = getStickyTop();
+        const sentinelDocumentTop = getTopWithinScrollTarget(sentinel, state.scrollTarget);
+        const tabHeight = buttons[0]?.getBoundingClientRect().height || 0;
+        state.startY = Math.max(0, sentinelDocumentTop - stickyTop);
+        state.travel = Math.max(80, Math.round(tabHeight * 1.05));
+        queueProgressUpdate();
+    }
+
+    const resizeObserver = typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => measure())
+        : null;
+    resizeObserver?.observe(tabRail);
+
+    state.scrollTarget.addEventListener('scroll', queueProgressUpdate, { passive: true });
+    window.addEventListener('resize', measure);
+    measure();
+
+    return {
+        cleanup() {
+            if (state.rafId) {
+                window.cancelAnimationFrame(state.rafId);
+            }
+            resizeObserver?.disconnect();
+            state.scrollTarget.removeEventListener('scroll', queueProgressUpdate);
+            window.removeEventListener('resize', measure);
+            header.classList.remove('agents-control-header--stuck');
+            header.style.removeProperty('--agents-sticky-progress');
+            sentinel.remove();
+        }
+    };
+}
+
+function updatePanelCollapseDom(container, panelKey, collapsed, { animate = true } = {}) {
+    const panel = getPanelElement(container, panelKey);
+    if (!panel) return;
+    panel.classList.toggle('agents-panel--collapsed', collapsed);
+    const content = panel.querySelector('.agents-panel__content');
+    content?.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
+    const toggleButton = panel.querySelector('[data-acc-toggle-panel-collapse]');
+    if (toggleButton) {
+        const label = collapsed ? 'Expand panel' : 'Collapse panel';
+        toggleButton.setAttribute('aria-label', label);
+        toggleButton.setAttribute('title', label);
+        toggleButton.innerHTML = icon(collapsed ? 'chevronDown' : 'chevronUp', 16).outerHTML;
+    }
+    setPanelContentHeight(panel, collapsed, { animate });
+}
+
+async function togglePanelCollapsedState({
+    container,
+    data,
+    panelKey,
+    saveAccPreferences,
+    reflowPanelLayout,
+    collapsed
+}) {
+    const nextCollapsed = collapsed === undefined
+        ? togglePreferenceValue(data.preferences?.collapsedWidgets || [], panelKey)
+        : (collapsed
+            ? [...new Set([...(data.preferences?.collapsedWidgets || []), String(panelKey)])]
+            : (data.preferences?.collapsedWidgets || []).filter((item) => String(item) !== String(panelKey)));
+
+    if (data.preferences) {
+        data.preferences.collapsedWidgets = nextCollapsed;
+    }
+    updatePanelCollapseDom(container, panelKey, nextCollapsed.includes(String(panelKey)), { animate: true });
+    reflowPanelLayout?.(panelKey);
+    await persistPreference(saveAccPreferences, { collapsedWidgets: nextCollapsed });
 }
 
 function escTxt(value) {
@@ -368,6 +596,40 @@ function openSavedViewsModal({ data, applyLocalViewState, saveAccPreferences, sh
     });
 }
 
+function openSavedViewsMenu(anchor, { data, applyLocalViewState, saveAccPreferences, showToast }) {
+    const savedViews = data.preferences?.savedViews || [];
+    const items = savedViews.map((view) => ({
+        label: view.name,
+        iconName: view.id === data.viewState.savedViewId ? 'star' : 'eye',
+        onSelect: async () => {
+            const changes = { ...view.query, savedView: view.id, tab: view.tab || 'overview' };
+            const removals = ACC_QUERY_KEYS.filter((key) => !Object.prototype.hasOwnProperty.call(changes, key));
+            await applyLocalViewState({
+                changes,
+                removals,
+                preserveScroll: false
+            });
+        }
+    }));
+
+    if (items.length) items.push({ separator: true });
+
+    items.push(
+        {
+            label: 'Save Current View',
+            iconName: 'copy',
+            onSelect: () => openSaveViewModal({ data, applyLocalViewState, saveAccPreferences, showToast })
+        },
+        {
+            label: 'Manage Saved Views',
+            iconName: 'settings',
+            onSelect: () => openSavedViewsModal({ data, applyLocalViewState, saveAccPreferences, showToast })
+        }
+    );
+
+    openAccMenu(anchor, items, { align: 'right' });
+}
+
 function openPanelCustomizeModal({ container, data, applyLocalViewState }) {
     const panelKeys = getVisiblePanelKeys(container);
     const prefs = data.preferences || {};
@@ -396,7 +658,9 @@ function openPanelCustomizeModal({ container, data, applyLocalViewState }) {
         button.addEventListener('click', async () => {
             const key = button.dataset.accModalTogglePin;
             const nextPinned = togglePreferenceValue(prefs.pinnedWidgets || [], key);
-            const widgetOrder = ensureWidgetOrder(prefs.widgetOrder || [], key, { moveToFront: nextPinned.includes(key) });
+            const widgetOrder = nextPinned.includes(key)
+                ? ensureWidgetOrder(prefs.widgetOrder || [], key, { moveToFront: true })
+                : (prefs.widgetOrder || []);
             modal.close();
             await applyLocalViewState({
                 preferencePatch: { pinnedWidgets: nextPinned, widgetOrder }
@@ -578,78 +842,42 @@ function openBulkMenu(anchor, context) {
     ]);
 }
 
-async function movePanelByStep({ container, data, panelKey, step = -1, applyLocalViewState }) {
-    const visibleKeys = getVisiblePanelKeys(container);
-    const currentIndex = visibleKeys.indexOf(String(panelKey));
-    if (currentIndex === -1) return;
-    const targetIndex = Math.max(0, Math.min(visibleKeys.length - 1, currentIndex + step));
-    if (targetIndex === currentIndex) return;
-    const nextVisible = [...visibleKeys];
-    const [moved] = nextVisible.splice(currentIndex, 1);
-    nextVisible.splice(targetIndex, 0, moved);
-    await applyLocalViewState({
-        preferencePatch: {
-            widgetOrder: buildWidgetOrder(data, visibleKeys, nextVisible)
-        }
-    });
-}
-
 function openPanelMenu(anchor, {
     container,
     panelKey,
     data,
     applyLocalViewState,
-    showToast
+    saveAccPreferences
 }) {
     const prefs = data.preferences || {};
     const pinned = (prefs.pinnedWidgets || []).includes(panelKey);
     const collapsed = (prefs.collapsedWidgets || []).includes(panelKey);
-    openAccMenu(anchor, [
-        {
-            label: pinned ? 'Unpin Panel' : 'Pin Panel',
+    const items = [];
+    if (!pinned) {
+        items.push({
+            label: 'Pin Panel',
             iconName: 'pin',
             onSelect: async () => {
                 const nextPinned = togglePreferenceValue(prefs.pinnedWidgets || [], panelKey);
-                const widgetOrder = ensureWidgetOrder(prefs.widgetOrder || [], panelKey, { moveToFront: nextPinned.includes(panelKey) });
+                const widgetOrder = ensureWidgetOrder(prefs.widgetOrder || [], panelKey, { moveToFront: true });
                 await applyLocalViewState({
                     preferencePatch: { pinnedWidgets: nextPinned, widgetOrder }
                 });
             }
-        },
+        });
+    }
+    items.push(
+        pinned ? { separator: true } : null,
         {
             label: collapsed ? 'Expand Panel' : 'Collapse Panel',
             iconName: collapsed ? 'chevronDown' : 'chevronUp',
             onSelect: async () => {
-                const nextCollapsed = togglePreferenceValue(prefs.collapsedWidgets || [], panelKey);
-                await applyLocalViewState({
-                    preferencePatch: { collapsedWidgets: nextCollapsed }
+                await togglePanelCollapsedState({
+                    container,
+                    data,
+                    panelKey,
+                    saveAccPreferences
                 });
-            }
-        },
-        { separator: true },
-        {
-            label: 'Move Earlier',
-            iconName: 'chevronUp',
-            onSelect: () => movePanelByStep({ container, data, panelKey, step: -1, applyLocalViewState })
-        },
-        {
-            label: 'Move Later',
-            iconName: 'chevronDown',
-            onSelect: () => movePanelByStep({ container, data, panelKey, step: 1, applyLocalViewState })
-        },
-        { separator: true },
-        {
-            label: 'Copy Panel Link',
-            iconName: 'copy',
-            onSelect: async () => {
-                const url = getSearchState();
-                url.searchParams.set('panel', panelKey);
-                try {
-                    await navigator.clipboard.writeText(url.toString());
-                    showToast('Panel link copied', 'success');
-                } catch (err) {
-                    showToast(err.message || 'Copy failed', 'error');
-                }
             }
         },
         {
@@ -657,7 +885,8 @@ function openPanelMenu(anchor, {
             iconName: 'settings',
             onSelect: () => openPanelCustomizeModal({ container, data, applyLocalViewState })
         }
-    ]);
+    );
+    openAccMenu(anchor, items.filter(Boolean));
 }
 
 function openAgentMenu(anchor, agent, context) {
@@ -730,97 +959,390 @@ function openAgentMenu(anchor, agent, context) {
     openAccMenu(anchor, items);
 }
 
-function bindPanelDragAndDrop({ container, data, applyLocalViewState, saveAccPreferences }) {
+function bindPanelDragAndDrop({ container, data, saveAccPreferences, panelMeasurements = {}, setPanelMeasurements }) {
     const grid = container.querySelector('.agents-dashboard-grid');
-    if (!grid) return;
-    let draggedKey = null;
-    let draggedEl = null;
+    if (!grid) return { cleanup() {}, reflowPanelLayout() {}, finalizeLayout() {} };
+    const interactiveSelector = 'button, a, input, select, textarea, [role="button"], [data-route]';
+    const placeholderKey = '__panel_placeholder__';
+    let measurements = { ...(panelMeasurements || {}) };
+    let currentLayout = null;
+    let dragState = null;
 
-    const clearVisualState = () => {
-        container.querySelectorAll('.agents-panel--drop-target, .agents-panel-dock__tile--drop-target, .agents-panel--dragging, .agents-panel-dock__tile--dragging, .agents-panel--reordering')
-            .forEach((el) => {
-                el.classList.remove('agents-panel--drop-target', 'agents-panel-dock__tile--drop-target', 'agents-panel--dragging', 'agents-panel-dock__tile--dragging', 'agents-panel--reordering');
+    function getPinnedSet() {
+        return new Set((data.preferences?.pinnedWidgets || []).map((item) => String(item)));
+    }
+
+    function getPartitionForKey(key) {
+        return getPinnedSet().has(String(key || '').trim()) ? 'pinned' : 'unpinned';
+    }
+
+    function getPanelElements() {
+        return [...grid.querySelectorAll('.agents-panel[data-panel-key]')].filter((panel) => String(panel.dataset.panelKey || '') !== placeholderKey);
+    }
+
+    function updateMeasurementCache(panels = getPanelElements()) {
+        const next = { ...measurements };
+        const changed = {};
+        panels.forEach((panel) => {
+            const key = String(panel.dataset.panelKey || '').trim();
+            if (!key) return;
+            const measured = measurePanelHeights(panel);
+            const previous = next[key];
+            if (!previous || previous.collapsedUnits !== measured.collapsedUnits || previous.expandedUnits !== measured.expandedUnits) {
+                next[key] = measured;
+                changed[key] = measured;
+            }
+        });
+        measurements = next;
+        if (Object.keys(changed).length && typeof setPanelMeasurements === 'function') {
+            setPanelMeasurements(changed);
+        }
+        return measurements;
+    }
+
+    function createPanelSpec(panel) {
+        const key = String(panel.dataset.panelKey || '').trim();
+        return {
+            key,
+            span: getPanelSpan(panel),
+            collapsed: panel.classList.contains('agents-panel--collapsed'),
+            partition: getPartitionForKey(key),
+            measurements
+        };
+    }
+
+    function getOrderedSpecs({ excludeKey = '' } = {}) {
+        const pinned = [];
+        const unpinned = [];
+        getPanelElements()
+            .filter((panel) => String(panel.dataset.panelKey || '').trim() !== String(excludeKey || '').trim())
+            .forEach((panel) => {
+                const spec = createPanelSpec(panel);
+                if (spec.partition === 'pinned') pinned.push(spec);
+                else unpinned.push(spec);
             });
+        return [...pinned, ...unpinned];
+    }
+
+    function buildRuntimeLayout(specs, options = {}) {
+        return buildAccPanelLayout(specs, { ...options, measurements });
+    }
+
+    function applyLayout(layout, placeholderEl = null) {
+        currentLayout = layout;
+        const elements = new Map(getPanelElements().map((panel) => [String(panel.dataset.panelKey || '').trim(), panel]));
+        if (placeholderEl) elements.set(placeholderKey, placeholderEl);
+        layout.items.forEach((item) => {
+            if (dragState?.active && item.key === dragState.key) return;
+            const element = elements.get(item.key);
+            if (!element) return;
+            element.style.gridColumn = `${item.x + 1} / span ${item.w}`;
+            element.style.gridRow = `${item.y + 1} / span ${item.h}`;
+            element.dataset.layoutX = String(item.x);
+            element.dataset.layoutY = String(item.y);
+            element.dataset.layoutW = String(item.w);
+            element.dataset.layoutH = String(item.h);
+        });
+        grid.style.setProperty('--agents-grid-total-rows', String(layout.totalRows || 1));
+    }
+
+    function reorderPanelsInDom(orderedKeys) {
+        const elementMap = new Map(getPanelElements().map((panel) => [String(panel.dataset.panelKey || '').trim(), panel]));
+        const fragment = document.createDocumentFragment();
+        orderedKeys.forEach((key) => {
+            const element = elementMap.get(String(key));
+            if (element) fragment.appendChild(element);
+        });
+        grid.appendChild(fragment);
+    }
+
+    function persistOrder(orderedKeys) {
+        const existing = Array.isArray(data.preferences?.widgetOrder) ? data.preferences.widgetOrder.map((item) => String(item)) : [];
+        const visibleSet = new Set(orderedKeys.map((item) => String(item)));
+        const finalOrder = [...orderedKeys.map((item) => String(item)), ...existing.filter((item) => !visibleSet.has(item))];
+        if (data.preferences) data.preferences.widgetOrder = finalOrder;
+        if (typeof saveAccPreferences === 'function') {
+            saveAccPreferences({ widgetOrder: finalOrder }).catch((err) => console.warn('Panel drag: failed to persist widget order', err));
+        }
+    }
+
+    function createPlaceholderElement() {
+        const placeholder = document.createElement('div');
+        placeholder.className = `card agents-panel agents-panel--placeholder ${dragState.span === 8 ? 'agents-panel--wide' : ''}`;
+        placeholder.dataset.panelKey = placeholderKey;
+        placeholder.dataset.panelSpan = String(dragState.span);
+        placeholder.dataset.panelPartition = dragState.partition;
+        return placeholder;
+    }
+
+    function resetDraggedPanelStyles(panel) {
+        if (!panel) return;
+        panel.classList.remove('agents-panel--dragging');
+        panel.style.position = '';
+        panel.style.left = '';
+        panel.style.top = '';
+        panel.style.width = '';
+        panel.style.height = '';
+        panel.style.zIndex = '';
+        panel.style.pointerEvents = '';
+        panel.style.transform = '';
+    }
+
+    function updateDraggedPanelPosition(clientX, clientY) {
+        if (!dragState?.active) return;
+        dragState.panel.style.left = `${clientX - dragState.offsetX}px`;
+        dragState.panel.style.top = `${clientY - dragState.offsetY}px`;
+    }
+
+    function deriveOrderedKeysFromLayout(layout, draggedKey = '') {
+        return [...layout.items]
+            .sort((left, right) => {
+                if (left.partition !== right.partition) return left.partition === 'pinned' ? -1 : 1;
+                if (left.y !== right.y) return left.y - right.y;
+                if (left.x !== right.x) return left.x - right.x;
+                return String(left.key).localeCompare(String(right.key));
+            })
+            .map((item) => item.key === placeholderKey ? draggedKey : item.key)
+            .filter(Boolean);
+    }
+
+    function getPlaceholderHeightUnits() {
+        return getPanelHeightUnits({
+            key: placeholderKey,
+            collapsed: dragState.collapsed,
+            span: dragState.span
+        }, {
+            ...measurements,
+            [placeholderKey]: dragState.measurement
+        });
+    }
+
+    function getDesiredSlot(clientX, clientY, partitionBounds) {
+        const gridRect = grid.getBoundingClientRect();
+        const metrics = getGridMetrics(gridRect);
+        const rowSize = metrics.rowHeight + metrics.gap;
+        const desiredLeft = clientX - dragState.offsetX;
+        const desiredTop = clientY - dragState.offsetY;
+        const x = getColumnStarts(dragState.span).reduce((bestColumn, column) => {
+            const columnLeft = gridRect.left + (column * (metrics.columnWidth + metrics.gap));
+            const bestLeft = gridRect.left + (bestColumn * (metrics.columnWidth + metrics.gap));
+            return Math.abs(columnLeft - desiredLeft) < Math.abs(bestLeft - desiredLeft) ? column : bestColumn;
+        }, 0);
+        return {
+            gridRect,
+            desiredLeft,
+            desiredTop,
+            x,
+            y: Math.max(partitionBounds.startRow, Math.round((desiredTop - gridRect.top) / rowSize))
+        };
+    }
+
+    function buildPreviewForSlot(specs, x, y) {
+        const layout = buildRuntimeLayout(specs, {
+            lockedItems: [{
+                key: placeholderKey,
+                partition: dragState.partition,
+                x,
+                y,
+                span: dragState.span,
+                h: getPlaceholderHeightUnits()
+            }],
+            partitionStartRows: dragState.partition === 'unpinned' ? { unpinned: y } : { pinned: 0 }
+        });
+        return { x, y, layout, orderedKeys: deriveOrderedKeysFromLayout(layout, dragState.key) };
+    }
+
+    function choosePreview(clientX, clientY) {
+        const specs = getOrderedSpecs({ excludeKey: dragState.key });
+        const baseLayout = buildRuntimeLayout(specs);
+        const bounds = baseLayout.partitionBounds[dragState.partition];
+        const desired = getDesiredSlot(clientX, clientY, bounds);
+        const allowedColumns = getColumnStarts(dragState.span);
+        const rowStart = Math.max(bounds.startRow, desired.y - 2);
+        const rowEnd = Math.max(bounds.endRow + 4, desired.y + 4);
+        let best = null;
+
+        for (let row = rowStart; row <= rowEnd; row += 1) {
+            for (const column of allowedColumns) {
+                const preview = buildPreviewForSlot(specs, column, row);
+                const placeholderItem = preview.layout.byKey.get(placeholderKey);
+                const rect = layoutItemToPixels(placeholderItem, desired.gridRect);
+                const score = (Math.abs(column - desired.x) * 120) + (Math.abs(row - desired.y) * 40) + (Math.abs(rect.left - desired.desiredLeft) * 0.08) + (Math.abs(rect.top - desired.desiredTop) * 0.08);
+                if (!best || score < best.score) best = { score, preview };
+            }
+        }
+
+        return best?.preview || buildPreviewForSlot(specs, desired.x, desired.y);
+    }
+
+    function finalizeLayout() {
+        updateMeasurementCache();
+        const layout = buildRuntimeLayout(getOrderedSpecs());
+        applyLayout(layout);
+        return layout;
+    }
+
+    function reflowPanelLayout(panelKey) {
+        updateMeasurementCache();
+        const specs = getOrderedSpecs();
+        const anchorIndex = specs.findIndex((spec) => spec.key === String(panelKey));
+        const baseLayout = currentLayout || buildRuntimeLayout(specs);
+        const anchorSpec = specs[anchorIndex];
+        const anchorItem = anchorSpec ? baseLayout.byKey.get(anchorSpec.key) : null;
+        if (!anchorSpec || !anchorItem) return finalizeLayout();
+
+        const lockedItems = [];
+        const remainingSpecs = [];
+        specs.forEach((spec, index) => {
+            const item = baseLayout.byKey.get(spec.key);
+            if (!item) return;
+            if (spec.partition !== anchorSpec.partition) {
+                if (anchorSpec.partition === 'unpinned' && spec.partition === 'pinned') {
+                    lockedItems.push({ key: spec.key, partition: spec.partition, x: item.x, y: item.y, span: item.w, h: item.h });
+                } else if (anchorSpec.partition === 'pinned' && spec.partition === 'unpinned') {
+                    remainingSpecs.push(spec);
+                }
+                return;
+            }
+            if (index < anchorIndex) {
+                lockedItems.push({ key: spec.key, partition: spec.partition, x: item.x, y: item.y, span: item.w, h: item.h });
+                return;
+            }
+            if (spec.key === anchorSpec.key) {
+                lockedItems.push({ key: spec.key, partition: spec.partition, x: anchorItem.x, y: anchorItem.y, span: anchorItem.w, h: getPanelHeightUnits(anchorSpec, measurements) });
+                return;
+            }
+            remainingSpecs.push(spec);
+        });
+
+        const layout = buildRuntimeLayout(remainingSpecs, {
+            lockedItems,
+            partitionStartRows: anchorSpec.partition === 'pinned' ? { pinned: anchorItem.y } : { unpinned: anchorItem.y }
+        });
+        applyLayout(layout);
+        return layout;
+    }
+
+    function finishDrag(cancelled = false) {
+        if (!dragState) return;
+        const state = dragState;
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        window.removeEventListener('resize', onResize);
+        document.body.classList.remove('agents-panels--dragging');
+        if (!cancelled && state.active && state.preview) {
+            reorderPanelsInDom(state.preview.orderedKeys);
+            persistOrder(state.preview.orderedKeys);
+        }
+        state.placeholder?.remove();
+        resetDraggedPanelStyles(state.panel);
+        if (state.panel?.releasePointerCapture && state.pointerId != null) {
+            try { state.panel.releasePointerCapture(state.pointerId); } catch {}
+        }
+        dragState = null;
+        finalizeLayout();
+    }
+
+    function startDrag() {
+        if (!dragState || dragState.active) return;
+        dragState.active = true;
+        dragState.placeholder = createPlaceholderElement();
+        grid.appendChild(dragState.placeholder);
+        dragState.panel.classList.add('agents-panel--dragging');
+        dragState.panel.style.position = 'fixed';
+        dragState.panel.style.left = `${dragState.rect.left}px`;
+        dragState.panel.style.top = `${dragState.rect.top}px`;
+        dragState.panel.style.width = `${dragState.rect.width}px`;
+        dragState.panel.style.height = `${dragState.rect.height}px`;
+        dragState.panel.style.zIndex = '40';
+        dragState.panel.style.pointerEvents = 'none';
+        document.body.classList.add('agents-panels--dragging');
+        dragState.preview = choosePreview(dragState.lastX, dragState.lastY);
+        applyLayout(dragState.preview.layout, dragState.placeholder);
+        updateDraggedPanelPosition(dragState.lastX, dragState.lastY);
+    }
+
+    function onPointerMove(event) {
+        if (!dragState || event.pointerId !== dragState.pointerId) return;
+        dragState.lastX = event.clientX;
+        dragState.lastY = event.clientY;
+        if (!dragState.active) {
+            if (Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) < 6) return;
+            startDrag();
+        }
+        event.preventDefault();
+        updateDraggedPanelPosition(event.clientX, event.clientY);
+        const preview = choosePreview(event.clientX, event.clientY);
+        if (!dragState.preview || preview.x !== dragState.preview.x || preview.y !== dragState.preview.y) {
+            dragState.preview = preview;
+            applyLayout(preview.layout, dragState.placeholder);
+        }
+    }
+
+    function onPointerUp(event) {
+        if (!dragState || event.pointerId !== dragState.pointerId) return;
+        finishDrag(false);
+    }
+
+    function onResize() {
+        if (dragState?.active) {
+            dragState.preview = choosePreview(dragState.lastX, dragState.lastY);
+            applyLayout(dragState.preview.layout, dragState.placeholder);
+            return;
+        }
+        finalizeLayout();
+    }
+
+    function onPointerDown(event) {
+        if (event.button !== 0) return;
+        const header = event.target.closest('.agents-panel__header');
+        if (!header || !grid.contains(header) || event.target.closest(interactiveSelector)) return;
+        const panel = header.closest('.agents-panel[data-panel-key]');
+        if (!panel || panel.classList.contains('agents-panel--collapsing')) return;
+        updateMeasurementCache();
+        const key = String(panel.dataset.panelKey || '').trim();
+        const rect = panel.getBoundingClientRect();
+        dragState = {
+            key,
+            panel,
+            partition: getPartitionForKey(key),
+            span: getPanelSpan(panel),
+            collapsed: panel.classList.contains('agents-panel--collapsed'),
+            measurement: measurements[key] || measurePanelHeights(panel),
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastX: event.clientX,
+            lastY: event.clientY,
+            offsetX: event.clientX - rect.left,
+            offsetY: event.clientY - rect.top,
+            rect,
+            active: false,
+            placeholder: null,
+            preview: null
+        };
+        if (panel.setPointerCapture) {
+            try { panel.setPointerCapture(event.pointerId); } catch {}
+        }
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointercancel', onPointerUp);
+        window.addEventListener('resize', onResize);
+    }
+
+    updateMeasurementCache();
+    finalizeLayout();
+    grid.addEventListener('pointerdown', onPointerDown);
+    return {
+        cleanup() {
+            grid.removeEventListener('pointerdown', onPointerDown);
+            finishDrag(true);
+            window.removeEventListener('resize', onResize);
+        },
+        reflowPanelLayout,
+        finalizeLayout
     };
-
-    const findPanelByKey = (key) =>
-        container.querySelector(`.agents-panel[data-panel-key="${CSS.escape(key)}"], .agents-panel-dock__tile[data-panel-key="${CSS.escape(key)}"]`);
-
-    const elements = container.querySelectorAll('.agents-panel[data-panel-key], .agents-panel-dock__tile[data-panel-key]');
-    elements.forEach((element) => {
-        element.addEventListener('dragstart', (event) => {
-            draggedKey = String(element.dataset.panelKey || '').trim();
-            draggedEl = element;
-            event.dataTransfer.setData(PANEL_DRAG_TYPE, draggedKey);
-            event.dataTransfer.effectAllowed = 'move';
-            requestAnimationFrame(() => {
-                element.classList.add(element.classList.contains('agents-panel-dock__tile') ? 'agents-panel-dock__tile--dragging' : 'agents-panel--dragging');
-            });
-        });
-
-        element.addEventListener('dragend', () => {
-            clearVisualState();
-            if (draggedEl) {
-                draggedEl.classList.remove('agents-panel--reordering');
-            }
-            draggedKey = null;
-            draggedEl = null;
-
-            const visibleKeys = getVisiblePanelKeys(container);
-            const prefs = data.preferences || {};
-            const existing = Array.isArray(prefs.widgetOrder) ? prefs.widgetOrder.map((i) => String(i)) : [];
-            const visibleSet = new Set(visibleKeys);
-            const rest = existing.filter((i) => !visibleSet.has(i) && !visibleKeys.includes(i));
-            const finalOrder = [...visibleKeys, ...rest];
-            if (typeof saveAccPreferences === 'function') {
-                saveAccPreferences({ widgetOrder: finalOrder }).catch((err) => {
-                    console.warn('Panel drag: failed to persist widget order', err);
-                });
-            }
-        });
-
-        element.addEventListener('dragover', (event) => {
-            if (!draggedKey || !draggedEl) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = 'move';
-            const targetKey = String(element.dataset.panelKey || '').trim();
-            if (!targetKey || targetKey === draggedKey) return;
-
-            const rect = element.getBoundingClientRect();
-            const useHorizontal = rect.width > rect.height * 1.2;
-            const placeAfter = useHorizontal
-                ? event.clientX > (rect.left + (rect.width / 2))
-                : event.clientY > (rect.top + (rect.height / 2));
-
-            const parent = element.parentNode;
-            if (!parent) return;
-
-            grid.querySelectorAll('.agents-panel').forEach((p) => p.classList.add('agents-panel--reordering'));
-
-            if (placeAfter) {
-                if (element.nextElementSibling !== draggedEl) {
-                    parent.insertBefore(draggedEl, element.nextElementSibling);
-                }
-            } else {
-                if (element.previousElementSibling !== draggedEl) {
-                    parent.insertBefore(draggedEl, element);
-                }
-            }
-
-            container.querySelectorAll('.agents-panel--drop-target, .agents-panel-dock__tile--drop-target')
-                .forEach((el) => el.classList.remove('agents-panel--drop-target', 'agents-panel-dock__tile--drop-target'));
-            element.classList.add(element.classList.contains('agents-panel-dock__tile') ? 'agents-panel-dock__tile--drop-target' : 'agents-panel--drop-target');
-        });
-
-        element.addEventListener('dragleave', () => {
-            element.classList.remove('agents-panel--drop-target', 'agents-panel-dock__tile--drop-target');
-        });
-
-        element.addEventListener('drop', (event) => {
-            event.preventDefault();
-            clearVisualState();
-        });
-    });
 }
 
 function bindAgentDragAndDrop({ container, categories, agentMap, api, showToast, refreshAgents }) {
@@ -883,12 +1405,22 @@ export function bindAccInteractions({
     refreshAgents,
     applyLocalViewState,
     saveAccPreferences,
+    panelMeasurements,
+    setPanelMeasurements,
     renderAccCategoryManager
 } = {}) {
     const categories = data.library?.categories || [];
     const agentMap = data.library?.agentMap || new Map();
     const openAccRoute = (route) => openRoute(route, { applyLocalViewState, navigateRoute });
     const goToRoute = (route) => (isAccRoute(route) ? openAccRoute(route) : navigateRoute(route));
+    const panelLayoutController = bindPanelDragAndDrop({
+        container,
+        data,
+        saveAccPreferences,
+        panelMeasurements,
+        setPanelMeasurements
+    });
+    const stickyHeaderController = bindStickyHeaderTuckIn(container);
 
     let searchDebounce = null;
     container.addEventListener('submit', async (event) => {
@@ -974,8 +1506,8 @@ export function bindAccInteractions({
     container.addEventListener('click', async (event) => {
         const routeEl = event.target.closest('[data-route]');
         const panelMenu = event.target.closest('[data-acc-panel-menu]');
-        const panelCollapse = event.target.closest('[data-acc-collapse-panel]');
-        const refreshPanel = event.target.closest('[data-refresh-dashboard-panel]');
+        const panelCollapse = event.target.closest('[data-acc-toggle-panel-collapse]');
+        const panelPin = event.target.closest('[data-acc-toggle-panel-pin]');
         const tabButton = event.target.closest('[data-agents-tab]');
         const metricButton = event.target.closest('[data-acc-metric]');
         const smartCollection = event.target.closest('[data-smart-collection]');
@@ -989,12 +1521,10 @@ export function bindAccInteractions({
         const openRequest = event.target.closest('[data-acc-open-request]');
         const openGrant = event.target.closest('[data-acc-open-grant]');
         const toggleGroup = event.target.closest('[data-acc-toggle-group]');
-        const openSavedViews = event.target.closest('#agents-acc-open-saved-views');
-        const saveView = event.target.closest('#agents-acc-save-view');
+        const openSavedViews = event.target.closest('#agents-acc-saved-views-menu');
         const openPanelCustomize = event.target.closest('[data-acc-open-panel-customize]');
         const openCategoryManager = event.target.closest('[data-acc-open-category-manager]');
         const clearLibraryFilters = event.target.closest('[data-acc-clear-library-filters]');
-        const copyLink = event.target.closest('#agents-acc-copy-link');
         const refreshButton = event.target.closest('#agents-acc-refresh');
 
         if (tabButton) {
@@ -1021,33 +1551,9 @@ export function bindAccInteractions({
             return;
         }
 
-        if (copyLink) {
-            event.preventDefault();
-            try {
-                await navigator.clipboard.writeText(location.href);
-                showToast('Control center link copied', 'success');
-            } catch (err) {
-                showToast(err.message || 'Copy failed', 'error');
-            }
-            return;
-        }
-
         if (refreshButton) {
             event.preventDefault();
-            await refreshAgents({
-                invalidateAll: true,
-                invalidateLibrary: data.viewState.activeTab === 'library'
-            });
-            return;
-        }
-
-        if (refreshPanel) {
-            event.preventDefault();
-            const section = String(data.viewState.activeTab || 'overview');
-            await refreshAgents({
-                invalidateSections: section === 'overview' ? ['overview'] : ['overview', section],
-                invalidateLibrary: section === 'library'
-            });
+            location.reload();
             return;
         }
 
@@ -1058,17 +1564,36 @@ export function bindAccInteractions({
                 panelKey: panelMenu.dataset.accPanelMenu,
                 data,
                 applyLocalViewState,
-                showToast
+                saveAccPreferences
             });
             return;
         }
 
         if (panelCollapse) {
             event.preventDefault();
-            const key = String(panelCollapse.dataset.accCollapsePanel || '').trim();
-            const nextCollapsed = togglePreferenceValue(data.preferences?.collapsedWidgets || [], key);
+            const key = String(panelCollapse.dataset.accTogglePanelCollapse || '').trim();
+            await togglePanelCollapsedState({
+                container,
+                data,
+                panelKey: key,
+                saveAccPreferences,
+                reflowPanelLayout: panelLayoutController.reflowPanelLayout
+            });
+            return;
+        }
+
+        if (panelPin) {
+            event.preventDefault();
+            const key = String(panelPin.dataset.accTogglePanelPin || '').trim();
+            const isPinned = (data.preferences?.pinnedWidgets || []).includes(key);
+            const nextPinned = togglePreferenceValue(data.preferences?.pinnedWidgets || [], key);
             await applyLocalViewState({
-                preferencePatch: { collapsedWidgets: nextCollapsed }
+                preferencePatch: {
+                    pinnedWidgets: nextPinned,
+                    widgetOrder: isPinned
+                        ? (data.preferences?.widgetOrder || [])
+                        : ensureWidgetOrder(data.preferences?.widgetOrder || [], key, { moveToFront: true })
+                }
             });
             return;
         }
@@ -1191,13 +1716,7 @@ export function bindAccInteractions({
 
         if (openSavedViews) {
             event.preventDefault();
-            openSavedViewsModal({ data, applyLocalViewState, saveAccPreferences, showToast });
-            return;
-        }
-
-        if (saveView) {
-            event.preventDefault();
-            openSaveViewModal({ data, applyLocalViewState, saveAccPreferences, showToast });
+            openSavedViewsMenu(openSavedViews, { data, applyLocalViewState, saveAccPreferences, showToast });
             return;
         }
 
@@ -1234,11 +1753,8 @@ export function bindAccInteractions({
         }
     });
 
-    bindPanelDragAndDrop({
-        container,
-        data,
-        applyLocalViewState,
-        saveAccPreferences
+    container.querySelectorAll('.agents-panel[data-panel-key]').forEach((panel) => {
+        updatePanelCollapseDom(container, panel.dataset.panelKey, panel.classList.contains('agents-panel--collapsed'), { animate: false });
     });
 
     bindAgentDragAndDrop({
@@ -1252,5 +1768,7 @@ export function bindAccInteractions({
 
     return () => {
         if (searchDebounce) clearTimeout(searchDebounce);
+        stickyHeaderController.cleanup?.();
+        panelLayoutController.cleanup?.();
     };
 }
